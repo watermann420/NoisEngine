@@ -1,112 +1,126 @@
 # Contributing to MusicEngine
+## Idea Ownership & Code Assignment Agreement
 
-Thank you for your interest in contributing to **MusicEngine**  
-This project welcomes creative, respectful, and curious contributors.
+Thank you for your interest in contributing to **MusicEngine** 🎶  
+MusicEngine is built on creativity, experimentation, and collaboration.
 
-By contributing to this repository, you agree to the terms described below.
+To keep the project legally clear while respecting contributors,  
+the following rules apply to **all contributions**.
 
----
-
-## 1. Copyright Ownership
-
-You **retain full copyright** to your contributions.
-
-This means:
-- You do **not** give up ownership of your code, text, assets, or ideas.
-- You are free to reuse your contribution in other projects, including commercial ones.
+By contributing, you agree to this agreement.
 
 ---
 
-## 2. License Grant to MusicEngine
+## 1. Ideas & Concepts
 
-By submitting a contribution (including but not limited to code, documentation, assets, or ideas), you grant the **MusicEngine project and its maintainer** a:
+All **ideas, concepts, suggestions, feature proposals, and discussions**
+(shared via issues, discussions, chats, or comments):
 
-- worldwide  
-- perpetual  
-- non-exclusive  
-- royalty-free  
-- irrevocable  
+- remain the intellectual property of the contributor,
+- are **not automatically owned** by MusicEngine,
+- may be reused by the contributor in other projects.
 
-license to:
-
-- use your contribution,
-- modify it,
-- merge it into the project,
-- distribute it as part of MusicEngine,
-- sublicense it as part of MusicEngine,
-- continue using it if the project grows, changes ownership, or becomes part of a foundation or organization in the future.
-
-This license is required to keep the project legally clean and sustainable long-term.
+Submitting an idea alone does **not** transfer ownership.
 
 ---
 
-## 3. No Transfer of Ownership
+## 2. Code & Implementations
 
-Except for the license described above:
+All **code and technical implementations** that are:
 
-- **All rights remain with you**
-- You are **not transferring ownership**
-- You are **not assigning copyright**
+- submitted as pull requests,
+- committed to this repository,
+- merged into MusicEngine,
 
-You are simply allowing MusicEngine to legally use your contribution.
+become the **exclusive property of MusicEngine**.
 
----
+This includes:
+- source code
+- scripts
+- engine modules
+- internal tools
+- documentation directly tied to code behavior
 
-## 4. No Obligation of Support
-
-Contributing does **not** require you to:
-
-- maintain your contribution,
-- provide ongoing support,
-- fix bugs after submission.
-
-Any further involvement is completely voluntary.
+By submitting code, you **assign all copyrights** of that code to MusicEngine.
 
 ---
 
-## 5. Project Vision & Future
+## 3. Separation of Idea and Code
 
-MusicEngine is intended to grow as an open, experimental, and creative platform.
+An idea does **not** become owned by MusicEngine until it is:
 
-If the project ever becomes large, commercial, or part of a non-profit foundation or organization:
-- this contribution model ensures legal clarity,
-- contributors are respected,
-- and the project can continue without legal risk.
+- implemented in code, **and**
+- submitted to this repository.
 
----
-
-## 6. Community & Opportunities
-
-MusicEngine values **kindness, creativity, and collaboration**.
-
-If the project grows significantly:
-- contributors who are helpful, respectful, and innovative
-- may be invited to collaborate more closely
-- or even offered paid roles or positions **if they wish**
-
-There is **no obligation**, only opportunity.
+Only the **actual written code** is assigned —  
+the underlying idea remains yours.
 
 ---
 
-## 7. Agreement
+## 4. Moral Rights & Modification
 
-By submitting a contribution (via pull request, commit, issue with code, or any other form), you confirm that:
+Where applicable by law, contributors agree to:
 
-- you have the right to submit the contribution,
-- the contribution is your own work or properly licensed,
-- you agree to the terms in this document.
-
----
-
-## 8. License Compatibility
-
-All contributions must be compatible with the project's main license:
-
-**MIT License**
-
-If you are unsure whether your contribution is compatible, please ask before submitting.
+- waive or not assert moral rights related to contributed code,
+- allow MusicEngine to modify, rewrite, relicense, or restructure the code
+  without restriction.
 
 ---
 
-Thank you for helping build **MusicEngine** ❤️  
-Let’s make something beautiful together.
+## 5. License Back to Contributors
+
+Unless explicitly stated, contributors do **not** receive an automatic license
+to reuse contributed code outside of MusicEngine.
+
+Reuse requires explicit permission from the MusicEngine maintainer.
+
+---
+
+## 6. Project Control & Future
+
+MusicEngine retains full control over:
+- project direction,
+- licensing and relicensing,
+- commercial and non-commercial use,
+- future foundation, organization, or company structures.
+
+This applies regardless of project size or success.
+
+---
+
+## 7. Community & Opportunities
+
+MusicEngine values contributors who are:
+- respectful,
+- kind,
+- creative,
+- collaborative.
+
+If the project grows, contributors who wish to may:
+- be publicly credited,
+- be invited into closer collaboration,
+- be considered for paid roles or positions.
+
+No obligation, no guarantee.
+
+---
+
+## 8. Contributor Declaration
+
+By contributing, you confirm that:
+- you have the legal right to submit ideas and/or code,
+- any submitted code is your own work,
+- the contribution does not violate third-party rights,
+- you agree to this agreement.
+
+---
+
+## 9. Acceptance
+
+Submitting ideas, code, pull requests, or commits
+constitutes acceptance of this agreement.
+
+---
+
+**MusicEngine**  
+_All code rights reserved._
