@@ -63,14 +63,14 @@ Git: https://github.com/watermann420/MusicEngineEditor
 - Fully extendable and open-source  
 - Future support for live collaboration and remixing  
 - Patterns and songs as code → versionable, comparable, remixable  
-- Focused on stability, repairability, and studio-quality audio  
+- Focused on stability, repairability, and studio-quality audio
 
+  
+---
 
 ##Plz Read:
 LICENSE
 CONTRIBUTING
-
-
 
 ---
 
