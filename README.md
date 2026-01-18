@@ -68,7 +68,7 @@ Git: https://github.com/watermann420/MusicEngineEditor
   
 ---
 
-##Plz Read:
+## Plz Read
 LICENSE
 CONTRIBUTING
 
