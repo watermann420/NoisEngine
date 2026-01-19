@@ -37,7 +37,10 @@ public class AudioEngine : IDisposable
     // VST Host
     private readonly VstHost _vstHost = new(); // VST Plugin Host
     private readonly Dictionary<string, VstPlugin> _vstRouting = new(); // VST Plugin Routing
-    
+
+    // Virtual Audio Channels
+    private readonly VirtualChannelManager _virtualChannels = new();
+
     // Constructor
     public AudioEngine(int? sampleRate = null)
     {
@@ -554,7 +557,41 @@ public class AudioEngine : IDisposable
         _masterVolume.Volume = gain; // Set master volume
         _masterGain = gain; // Store master gain
     }
-    
+
+    // === Virtual Audio Channel Methods ===
+
+    /// <summary>
+    /// Gets the virtual channel manager.
+    /// </summary>
+    public VirtualChannelManager VirtualChannels => _virtualChannels;
+
+    /// <summary>
+    /// Creates a virtual audio channel that other applications can read from.
+    /// </summary>
+    public VirtualAudioChannel CreateVirtualChannel(string name)
+    {
+        var channel = _virtualChannels.CreateChannel(name, _waveFormat.SampleRate, _waveFormat.Channels);
+        channel.Start();
+        return channel;
+    }
+
+    /// <summary>
+    /// Sends audio to a virtual channel (call from a sample provider).
+    /// </summary>
+    public void SendToVirtualChannel(string channelName, float[] samples)
+    {
+        var channel = _virtualChannels.GetChannel(channelName);
+        channel?.Write(samples);
+    }
+
+    /// <summary>
+    /// Lists all virtual channels.
+    /// </summary>
+    public void ListVirtualChannels()
+    {
+        _virtualChannels.ListChannels();
+    }
+
     // Dispose resources
     public void Dispose()
     {
@@ -569,5 +606,6 @@ public class AudioEngine : IDisposable
         foreach (var midiOut in _midiOutputs) midiOut.Dispose(); // Dispose MIDI outputs
 
         _vstHost.Dispose(); // Dispose VST host and all loaded plugins
+        _virtualChannels.Dispose(); // Dispose virtual channels
     }
 }

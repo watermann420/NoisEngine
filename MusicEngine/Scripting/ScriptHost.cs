@@ -61,6 +61,10 @@ public class ScriptGlobals
     public AudioEngine Engine { get; set; } = null!; // The audio engine instance
     public Sequencer Sequencer { get; set; } = null!; // The sequencer instance
 
+    // Lowercase aliases for convenience
+    public AudioEngine engine => Engine;
+    public Sequencer sequencer => Sequencer;
+
     // Creates and adds a SimpleSynth to the engine
     public SimpleSynth CreateSynth()
     {
@@ -172,6 +176,9 @@ public class ScriptGlobals
     public AudioControl audio => new AudioControl(this);
     public MidiControl midi => new MidiControl(this);
     public VstControl vst => new VstControl(this);
+    public SampleControl samples => new SampleControl(this);
+
+    public VirtualChannelControl virtualChannels => new VirtualChannelControl(this);
 
     // === VST Plugin Methods ===
 
@@ -209,6 +216,74 @@ public class ScriptGlobals
     public void ListLoadedVstPlugins()
     {
         Engine.PrintLoadedVstPlugins();
+    }
+
+    // === Sample Instrument Methods ===
+
+    /// <summary>
+    /// Creates a new sample instrument and adds it to the audio engine.
+    /// </summary>
+    public SampleInstrument CreateSampler(string? name = null)
+    {
+        var sampler = new SampleInstrument();
+        if (name != null) sampler.Name = name;
+        Engine.AddSampleProvider(sampler);
+        return sampler;
+    }
+
+    /// <summary>
+    /// Creates a sample instrument and loads a single sample.
+    /// The sample is mapped to all notes with pitch shifting from the root note.
+    /// </summary>
+    public SampleInstrument CreateSamplerFromFile(string filePath, int rootNote = 60)
+    {
+        var sampler = CreateSampler();
+        var sample = sampler.LoadSample(filePath, rootNote);
+        return sampler;
+    }
+
+    /// <summary>
+    /// Creates a sample instrument from a directory of samples.
+    /// Each sample is mapped to a note based on filename (e.g., "kick.wav" -> use LoadAndMap).
+    /// </summary>
+    public SampleInstrument CreateSamplerFromDirectory(string directoryPath)
+    {
+        var sampler = CreateSampler();
+        sampler.SetSampleDirectory(directoryPath);
+        return sampler;
+    }
+
+    /// <summary>
+    /// Loads a sample into an existing sampler and maps it to a specific note.
+    /// Great for drum pads.
+    /// </summary>
+    public Sample? LoadSampleToNote(SampleInstrument sampler, string filePath, int note)
+    {
+        var sample = sampler.LoadSample(filePath, note);
+        if (sample != null)
+        {
+            sampler.MapSampleToNote(sample, note);
+        }
+        return sample;
+    }
+
+    // === Virtual Audio Channel Methods ===
+
+    /// <summary>
+    /// Creates a virtual audio channel for routing audio to other applications.
+    /// Other apps can connect via the named pipe to receive audio.
+    /// </summary>
+    public VirtualAudioChannel CreateVirtualChannel(string name)
+    {
+        return Engine.CreateVirtualChannel(name);
+    }
+
+    /// <summary>
+    /// Lists all virtual audio channels.
+    /// </summary>
+    public void ListVirtualChannels()
+    {
+        Engine.ListVirtualChannels();
     }
 }
 
@@ -684,4 +759,191 @@ public class MidiOutputControl
         _globals.Engine.SendControlChange(_outputIndex, channel, controller, value);
         return this;
     }
+}
+
+// === Sample Fluent API ===
+
+/// <summary>
+/// Fluent API for creating and configuring sample instruments.
+/// </summary>
+public class SampleControl
+{
+    private readonly ScriptGlobals _globals;
+    public SampleControl(ScriptGlobals globals) => _globals = globals;
+
+    /// <summary>
+    /// Creates a new sampler.
+    /// </summary>
+    public SamplerBuilder create(string? name = null)
+    {
+        var sampler = _globals.CreateSampler(name);
+        return new SamplerBuilder(_globals, sampler);
+    }
+
+    /// <summary>
+    /// Loads a single sample as an instrument.
+    /// </summary>
+    public SamplerBuilder load(string filePath, int rootNote = 60)
+    {
+        var sampler = _globals.CreateSamplerFromFile(filePath, rootNote);
+        return new SamplerBuilder(_globals, sampler);
+    }
+
+    /// <summary>
+    /// Creates a sampler from a directory of samples.
+    /// </summary>
+    public SamplerBuilder fromDirectory(string path)
+    {
+        var sampler = _globals.CreateSamplerFromDirectory(path);
+        return new SamplerBuilder(_globals, sampler);
+    }
+}
+
+/// <summary>
+/// Builder for configuring a sample instrument.
+/// </summary>
+public class SamplerBuilder
+{
+    private readonly ScriptGlobals _globals;
+    private readonly SampleInstrument _sampler;
+
+    public SamplerBuilder(ScriptGlobals globals, SampleInstrument sampler)
+    {
+        _globals = globals;
+        _sampler = sampler;
+    }
+
+    /// <summary>
+    /// Gets the underlying sampler.
+    /// </summary>
+    public SampleInstrument Sampler => _sampler;
+
+    /// <summary>
+    /// Loads a sample and maps it to a specific note.
+    /// </summary>
+    public SamplerBuilder map(string filePath, int note)
+    {
+        _globals.LoadSampleToNote(_sampler, filePath, note);
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the sample directory for relative paths.
+    /// </summary>
+    public SamplerBuilder directory(string path)
+    {
+        _sampler.SetSampleDirectory(path);
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the master volume.
+    /// </summary>
+    public SamplerBuilder volume(float vol)
+    {
+        _sampler.Volume = vol;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the name.
+    /// </summary>
+    public SamplerBuilder name(string n)
+    {
+        _sampler.Name = n;
+        return this;
+    }
+
+    /// <summary>
+    /// Creates a pattern with this sampler.
+    /// </summary>
+    public Pattern pattern()
+    {
+        return _globals.CreatePattern(_sampler);
+    }
+
+    /// <summary>
+    /// Implicit conversion to SampleInstrument.
+    /// </summary>
+    public static implicit operator SampleInstrument(SamplerBuilder builder) => builder._sampler;
+}
+
+// === Virtual Channel Fluent API ===
+
+/// <summary>
+/// Fluent API for virtual audio channels.
+/// </summary>
+public class VirtualChannelControl
+{
+    private readonly ScriptGlobals _globals;
+    public VirtualChannelControl(ScriptGlobals globals) => _globals = globals;
+
+    /// <summary>
+    /// Creates a new virtual channel.
+    /// </summary>
+    public VirtualChannelBuilder create(string name)
+    {
+        var channel = _globals.CreateVirtualChannel(name);
+        return new VirtualChannelBuilder(channel);
+    }
+
+    /// <summary>
+    /// Lists all virtual channels.
+    /// </summary>
+    public void list() => _globals.ListVirtualChannels();
+}
+
+/// <summary>
+/// Builder for configuring virtual channels.
+/// </summary>
+public class VirtualChannelBuilder
+{
+    private readonly VirtualAudioChannel _channel;
+
+    public VirtualChannelBuilder(VirtualAudioChannel channel)
+    {
+        _channel = channel;
+    }
+
+    /// <summary>
+    /// Gets the underlying channel.
+    /// </summary>
+    public VirtualAudioChannel Channel => _channel;
+
+    /// <summary>
+    /// Sets the volume.
+    /// </summary>
+    public VirtualChannelBuilder volume(float vol)
+    {
+        _channel.Volume = vol;
+        return this;
+    }
+
+    /// <summary>
+    /// Starts the channel.
+    /// </summary>
+    public VirtualChannelBuilder start()
+    {
+        _channel.Start();
+        return this;
+    }
+
+    /// <summary>
+    /// Stops the channel.
+    /// </summary>
+    public VirtualChannelBuilder stop()
+    {
+        _channel.Stop();
+        return this;
+    }
+
+    /// <summary>
+    /// Gets the pipe name for connecting from other applications.
+    /// </summary>
+    public string pipeName => _channel.PipeName;
+
+    /// <summary>
+    /// Implicit conversion to VirtualAudioChannel.
+    /// </summary>
+    public static implicit operator VirtualAudioChannel(VirtualChannelBuilder builder) => builder._channel;
 }
