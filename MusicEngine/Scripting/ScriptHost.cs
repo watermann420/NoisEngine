@@ -73,11 +73,13 @@ public class ScriptGlobals
         return synth; // Return the created synth
     }
     
-    // Creates and adds a Pattern to the sequencer
+    // Creates a Pattern with reference to the sequencer
+    // The pattern is NOT automatically added - call pattern.Play() to start it
     public Pattern CreatePattern(ISynth synth)
     {
         var pattern = new Pattern(synth); // Create a new Pattern with the given synth
-        Sequencer.AddPattern(pattern); // Add it to the sequencer
+        pattern.Sequencer = Sequencer; // Set sequencer reference for Play()/Stop()
+        pattern.InstrumentName = synth is SimpleSynth ss ? (ss.Name ?? synth.GetType().Name) : synth.GetType().Name;
         return pattern; // Return the created pattern
     }
     

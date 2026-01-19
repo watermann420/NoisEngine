@@ -63,7 +63,7 @@ public class VstPlugin : ISynth, IDisposable
 
     public VstPluginInfo Info => _info;
     public WaveFormat WaveFormat => _waveFormat;
-    public string Name => _info.Name;
+    public string Name { get => _info.Name; set => _info.Name = value; }
     public bool IsInstrument => _info.IsInstrument;
 
     public VstPlugin(VstPluginInfo info, int sampleRate = 0)

@@ -323,11 +323,63 @@ public class Pattern
     /// <summary>Unique identifier for this pattern.</summary>
     public Guid Id { get; } = Guid.NewGuid();
 
+    /// <summary>Alias for IsLooping - simpler workshop syntax.</summary>
+    public bool Loop
+    {
+        get => IsLooping;
+        set => IsLooping = value;
+    }
 
     // Constructor to initialize the pattern with a synth
     public Pattern(ISynth synth)
     {
         Synth = synth;
+    }
+
+    /// <summary>
+    /// Add a note to the pattern using simple syntax.
+    /// pattern.Note(note, beat, duration, velocity)
+    /// </summary>
+    /// <param name="note">MIDI note number (0-127)</param>
+    /// <param name="beat">Beat position in pattern (0 to LoopLength)</param>
+    /// <param name="duration">Duration in beats</param>
+    /// <param name="velocity">Velocity (0-127)</param>
+    /// <returns>This pattern for chaining</returns>
+    public Pattern Note(int note, double beat, double duration, int velocity)
+    {
+        Events.Add(new NoteEvent
+        {
+            Note = note,
+            Beat = beat,
+            Duration = duration,
+            Velocity = velocity
+        });
+        return this;
+    }
+
+    /// <summary>
+    /// Start playing this pattern.
+    /// Registers with the sequencer and starts playback.
+    /// </summary>
+    public void Play()
+    {
+        if (Sequencer != null)
+        {
+            Sequencer.AddPattern(this);
+            if (!Sequencer.IsRunning)
+            {
+                Sequencer.Start();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Stop this pattern from playing.
+    /// </summary>
+    public void Stop()
+    {
+        Sequencer?.RemovePattern(this);
+        Synth?.AllNotesOff();
     }
 
 

@@ -12,6 +12,7 @@ namespace MusicEngine.Core;
 
 public interface ISynth : ISampleProvider
 {
+    string Name { get; set; }
     void NoteOn(int note, int velocity); // velocity 0-127
     void NoteOff(int note); // velocity 0-127
     void AllNotesOff(); // Stops all currently playing notes

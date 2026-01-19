@@ -33,6 +33,7 @@ public class SimpleSynth : ISynth
     public WaveType Waveform { get; set; } = WaveType.Sine; // Default waveform
     public float Cutoff { get; set; } = 1.0f; // 0.0 to 1.0 // Lowpass filter cutoff
     public float Resonance { get; set; } = 0.0f; // 0.0 to 1.0 // Lowpass filter resonance
+    public string Name { get; set; } = "SimpleSynth"; // Synth name for identification
     
     // ISampleProvider implementation
     public WaveFormat WaveFormat => _waveFormat;
