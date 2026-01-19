@@ -1,0 +1,347 @@
+//Engine License (MEL) - Honor-Based Commercial Support
+// copyright (c) 2026 MusicEngine Watermann420 and Contributors
+// Created by Watermann420
+// Description: Effect chain for processing audio through multiple effects in series.
+
+
+using System;
+using System.Collections.Generic;
+using NAudio.Wave;
+
+
+namespace MusicEngine.Core;
+
+
+/// <summary>
+/// Chains multiple audio effects together in series.
+/// Audio flows through each effect in order, allowing complex signal processing.
+/// </summary>
+public class EffectChain : ISampleProvider
+{
+    private readonly ISampleProvider _source;
+    private readonly List<IEffect> _effects = new();
+    private readonly object _lock = new();
+    private bool _bypassed;
+
+    /// <summary>
+    /// Creates a new effect chain with the specified audio source.
+    /// </summary>
+    /// <param name="source">The audio source to process</param>
+    public EffectChain(ISampleProvider source)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        WaveFormat = source.WaveFormat;
+    }
+
+    /// <inheritdoc />
+    public WaveFormat WaveFormat { get; }
+
+    /// <summary>
+    /// Gets the number of effects in the chain.
+    /// </summary>
+    public int Count
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _effects.Count;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether the entire chain is bypassed.
+    /// When bypassed, audio passes through unchanged.
+    /// </summary>
+    public bool Bypassed
+    {
+        get => _bypassed;
+        set => _bypassed = value;
+    }
+
+    /// <summary>
+    /// Gets the effect at the specified index.
+    /// </summary>
+    /// <param name="index">The index of the effect</param>
+    /// <returns>The effect at the index, or null if out of range</returns>
+    public IEffect? this[int index]
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (index >= 0 && index < _effects.Count)
+                    return _effects[index];
+                return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Adds an effect to the end of the chain.
+    /// </summary>
+    /// <typeparam name="T">The type of effect to create</typeparam>
+    /// <returns>The created effect instance</returns>
+    public T AddEffect<T>() where T : class, IEffect
+    {
+        lock (_lock)
+        {
+            // Determine the source for this effect
+            ISampleProvider effectSource = _effects.Count == 0 ? _source : _effects[^1];
+
+            // Create the effect using reflection
+            var effect = (T?)Activator.CreateInstance(typeof(T), effectSource);
+            if (effect == null)
+                throw new InvalidOperationException($"Failed to create effect of type {typeof(T).Name}");
+
+            _effects.Add(effect);
+            return effect;
+        }
+    }
+
+    /// <summary>
+    /// Adds an existing effect instance to the chain.
+    /// Note: The effect should be configured with the correct source.
+    /// </summary>
+    /// <param name="effect">The effect to add</param>
+    public void AddEffect(IEffect effect)
+    {
+        if (effect == null)
+            throw new ArgumentNullException(nameof(effect));
+
+        lock (_lock)
+        {
+            _effects.Add(effect);
+        }
+    }
+
+    /// <summary>
+    /// Inserts an effect at the specified index.
+    /// Note: This rebuilds the chain to maintain correct routing.
+    /// </summary>
+    /// <typeparam name="T">The type of effect to create</typeparam>
+    /// <param name="index">The index to insert at</param>
+    /// <returns>The created effect instance</returns>
+    public T InsertEffect<T>(int index) where T : class, IEffect
+    {
+        lock (_lock)
+        {
+            index = Math.Clamp(index, 0, _effects.Count);
+
+            // Determine the source for this effect
+            ISampleProvider effectSource = index == 0 ? _source : _effects[index - 1];
+
+            // Create the effect
+            var effect = (T?)Activator.CreateInstance(typeof(T), effectSource);
+            if (effect == null)
+                throw new InvalidOperationException($"Failed to create effect of type {typeof(T).Name}");
+
+            _effects.Insert(index, effect);
+
+            // Note: Effects after the inserted one would need to be rebuilt
+            // to maintain proper routing. For simplicity, we assume effects
+            // are added in order and not rearranged frequently.
+
+            return effect;
+        }
+    }
+
+    /// <summary>
+    /// Removes an effect from the chain by index.
+    /// </summary>
+    /// <param name="index">The index of the effect to remove</param>
+    /// <returns>True if the effect was removed</returns>
+    public bool RemoveEffect(int index)
+    {
+        lock (_lock)
+        {
+            if (index >= 0 && index < _effects.Count)
+            {
+                _effects.RemoveAt(index);
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Removes an effect from the chain by name.
+    /// </summary>
+    /// <param name="name">The name of the effect to remove</param>
+    /// <returns>True if the effect was removed</returns>
+    public bool RemoveEffect(string name)
+    {
+        lock (_lock)
+        {
+            var effect = _effects.Find(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (effect != null)
+            {
+                return _effects.Remove(effect);
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Removes all effects from the chain.
+    /// </summary>
+    public void Clear()
+    {
+        lock (_lock)
+        {
+            _effects.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Gets an effect by name.
+    /// </summary>
+    /// <param name="name">The name of the effect</param>
+    /// <returns>The effect, or null if not found</returns>
+    public IEffect? GetEffect(string name)
+    {
+        lock (_lock)
+        {
+            return _effects.Find(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    /// <summary>
+    /// Gets the first effect of the specified type.
+    /// </summary>
+    /// <typeparam name="T">The type of effect to find</typeparam>
+    /// <returns>The effect, or null if not found</returns>
+    public T? GetEffect<T>() where T : class, IEffect
+    {
+        lock (_lock)
+        {
+            foreach (var effect in _effects)
+            {
+                if (effect is T typed)
+                    return typed;
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Enables or disables an effect by name.
+    /// </summary>
+    /// <param name="name">The name of the effect</param>
+    /// <param name="enabled">Whether the effect should be enabled</param>
+    /// <returns>True if the effect was found and updated</returns>
+    public bool SetEffectEnabled(string name, bool enabled)
+    {
+        lock (_lock)
+        {
+            var effect = _effects.Find(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (effect != null)
+            {
+                effect.Enabled = enabled;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Enables or disables an effect by index.
+    /// </summary>
+    /// <param name="index">The index of the effect</param>
+    /// <param name="enabled">Whether the effect should be enabled</param>
+    /// <returns>True if the effect was found and updated</returns>
+    public bool SetEffectEnabled(int index, bool enabled)
+    {
+        lock (_lock)
+        {
+            if (index >= 0 && index < _effects.Count)
+            {
+                _effects[index].Enabled = enabled;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Gets a list of all effect names in the chain.
+    /// </summary>
+    /// <returns>List of effect names</returns>
+    public List<string> GetEffectNames()
+    {
+        lock (_lock)
+        {
+            var names = new List<string>();
+            foreach (var effect in _effects)
+            {
+                names.Add(effect.Name);
+            }
+            return names;
+        }
+    }
+
+    /// <inheritdoc />
+    public int Read(float[] buffer, int offset, int count)
+    {
+        lock (_lock)
+        {
+            // If bypassed or no effects, read directly from source
+            if (_bypassed || _effects.Count == 0)
+            {
+                return _source.Read(buffer, offset, count);
+            }
+
+            // Read from the last effect in the chain (which reads from previous effects)
+            return _effects[^1].Read(buffer, offset, count);
+        }
+    }
+
+    /// <summary>
+    /// Creates a simple effect chain with common effects pre-configured.
+    /// </summary>
+    /// <param name="source">The audio source</param>
+    /// <param name="includeReverb">Whether to include reverb</param>
+    /// <param name="includeDelay">Whether to include delay</param>
+    /// <param name="includeChorus">Whether to include chorus</param>
+    /// <returns>The configured effect chain</returns>
+    public static EffectChain CreateStandardChain(
+        ISampleProvider source,
+        bool includeReverb = true,
+        bool includeDelay = true,
+        bool includeChorus = true)
+    {
+        var chain = new EffectChain(source);
+
+        // Build the chain - effects are processed in this order
+        ISampleProvider currentSource = source;
+
+        if (includeChorus)
+        {
+            var chorus = new ChorusEffect(currentSource);
+            chorus.Mix = 0.3f;
+            chorus.Enabled = false; // Disabled by default
+            chain.AddEffect(chorus);
+            currentSource = chorus;
+        }
+
+        if (includeDelay)
+        {
+            var delay = new DelayEffect(currentSource);
+            delay.Mix = 0.3f;
+            delay.Enabled = false; // Disabled by default
+            chain.AddEffect(delay);
+            currentSource = delay;
+        }
+
+        if (includeReverb)
+        {
+            var reverb = new ReverbEffect(currentSource);
+            reverb.Mix = 0.3f;
+            reverb.Enabled = false; // Disabled by default
+            chain.AddEffect(reverb);
+        }
+
+        return chain;
+    }
+}

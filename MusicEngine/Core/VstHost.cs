@@ -1,4 +1,4 @@
-//Engine License (MEL) – Honor-Based Commercial Support
+//Engine License (MEL) - Honor-Based Commercial Support
 // copyright (c) 2026 MusicEngine Watermann420 and Contributors
 // Created by Watermann420
 // Description: VST Plugin Host for loading, managing, and processing VST plugins with MIDI support.
@@ -7,7 +7,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using NAudio.Wave;
 
@@ -16,315 +18,8 @@ namespace MusicEngine.Core;
 
 
 /// <summary>
-/// Represents information about a discovered VST plugin
-/// </summary>
-public class VstPluginInfo
-{
-    public string Name { get; set; } = "";
-    public string Path { get; set; } = "";
-    public string Vendor { get; set; } = "";
-    public string Version { get; set; } = "";
-    public int UniqueId { get; set; }
-    public bool IsInstrument { get; set; } // True for VSTi (instruments), false for effects
-    public bool IsLoaded { get; set; }
-    public int NumInputs { get; set; }
-    public int NumOutputs { get; set; }
-    public int NumParameters { get; set; }
-}
-
-
-/// <summary>
-/// VST Plugin wrapper that implements ISynth for seamless integration
-/// </summary>
-public class VstPlugin : ISynth, IDisposable
-{
-    private readonly VstPluginInfo _info;
-    private readonly WaveFormat _waveFormat;
-    private readonly float[] _outputBuffer;
-    private readonly float[] _inputBuffer;
-    private readonly object _lock = new();
-    private readonly List<(int note, int velocity)> _activeNotes = new();
-    private readonly Queue<VstMidiEvent> _midiEventQueue = new();
-    private IntPtr _pluginHandle = IntPtr.Zero;
-    private bool _isDisposed;
-    private float _masterVolume = 1.0f;
-
-    // MIDI event structure for VST
-    private struct VstMidiEvent
-    {
-        public int DeltaFrames;
-        public byte Status;
-        public byte Data1;
-        public byte Data2;
-
-        // Pack MIDI data for VST processing
-        public readonly int MidiData => Status | (Data1 << 8) | (Data2 << 16);
-    }
-
-    public VstPluginInfo Info => _info;
-    public WaveFormat WaveFormat => _waveFormat;
-    public string Name { get => _info.Name; set => _info.Name = value; }
-    public bool IsInstrument => _info.IsInstrument;
-
-    public VstPlugin(VstPluginInfo info, int sampleRate = 0)
-    {
-        _info = info;
-        int rate = sampleRate > 0 ? sampleRate : Settings.SampleRate;
-        _waveFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, Settings.Channels);
-        _outputBuffer = new float[Settings.VstBufferSize * Settings.Channels];
-        _inputBuffer = new float[Settings.VstBufferSize * Settings.Channels];
-    }
-
-    /// <summary>
-    /// Send a MIDI note on event to the VST plugin
-    /// </summary>
-    public void NoteOn(int note, int velocity)
-    {
-        lock (_lock)
-        {
-            _activeNotes.Add((note, velocity));
-            _midiEventQueue.Enqueue(new VstMidiEvent
-            {
-                DeltaFrames = 0,
-                Status = 0x90, // Note On, channel 1
-                Data1 = (byte)note,
-                Data2 = (byte)velocity
-            });
-        }
-    }
-
-    /// <summary>
-    /// Send a MIDI note off event to the VST plugin
-    /// </summary>
-    public void NoteOff(int note)
-    {
-        lock (_lock)
-        {
-            _activeNotes.RemoveAll(n => n.note == note);
-            _midiEventQueue.Enqueue(new VstMidiEvent
-            {
-                DeltaFrames = 0,
-                Status = 0x80, // Note Off, channel 1
-                Data1 = (byte)note,
-                Data2 = 0
-            });
-        }
-    }
-
-    /// <summary>
-    /// Stop all playing notes
-    /// </summary>
-    public void AllNotesOff()
-    {
-        lock (_lock)
-        {
-            foreach (var (note, _) in _activeNotes.ToArray())
-            {
-                NoteOff(note);
-            }
-            _activeNotes.Clear();
-
-            // Send All Notes Off CC (CC 123)
-            _midiEventQueue.Enqueue(new VstMidiEvent
-            {
-                DeltaFrames = 0,
-                Status = 0xB0, // Control Change, channel 1
-                Data1 = 123,   // All Notes Off
-                Data2 = 0
-            });
-        }
-    }
-
-    /// <summary>
-    /// Send a Control Change message to the VST plugin
-    /// </summary>
-    public void SendControlChange(int channel, int controller, int value)
-    {
-        lock (_lock)
-        {
-            _midiEventQueue.Enqueue(new VstMidiEvent
-            {
-                DeltaFrames = 0,
-                Status = (byte)(0xB0 | (channel & 0x0F)),
-                Data1 = (byte)controller,
-                Data2 = (byte)value
-            });
-        }
-    }
-
-    /// <summary>
-    /// Send a Pitch Bend message to the VST plugin
-    /// </summary>
-    public void SendPitchBend(int channel, int value)
-    {
-        lock (_lock)
-        {
-            _midiEventQueue.Enqueue(new VstMidiEvent
-            {
-                DeltaFrames = 0,
-                Status = (byte)(0xE0 | (channel & 0x0F)),
-                Data1 = (byte)(value & 0x7F),
-                Data2 = (byte)((value >> 7) & 0x7F)
-            });
-        }
-    }
-
-    /// <summary>
-    /// Send a Program Change message to the VST plugin
-    /// </summary>
-    public void SendProgramChange(int channel, int program)
-    {
-        lock (_lock)
-        {
-            _midiEventQueue.Enqueue(new VstMidiEvent
-            {
-                DeltaFrames = 0,
-                Status = (byte)(0xC0 | (channel & 0x0F)),
-                Data1 = (byte)program,
-                Data2 = 0
-            });
-        }
-    }
-
-    /// <summary>
-    /// Set a VST parameter by name or index
-    /// </summary>
-    public void SetParameter(string name, float value)
-    {
-        lock (_lock)
-        {
-            // Handle common parameters
-            switch (name.ToLowerInvariant())
-            {
-                case "volume":
-                case "gain":
-                case "level":
-                    _masterVolume = Math.Clamp(value, 0f, 1f);
-                    break;
-                case "pitchbend":
-                    int bendValue = (int)(value * 16383);
-                    SendPitchBend(0, bendValue);
-                    break;
-                default:
-                    // Try to parse as parameter index
-                    if (int.TryParse(name, out int paramIndex) && paramIndex >= 0)
-                    {
-                        SetParameterByIndex(paramIndex, value);
-                    }
-                    break;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Set a VST parameter by index
-    /// </summary>
-    public void SetParameterByIndex(int index, float value)
-    {
-        // This would call into the actual VST plugin via P/Invoke
-        // For now, we store the intent
-        lock (_lock)
-        {
-            // Implementation would use the plugin handle to set parameters
-        }
-    }
-
-    /// <summary>
-    /// Read audio samples from the VST plugin
-    /// </summary>
-    public int Read(float[] buffer, int offset, int count)
-    {
-        lock (_lock)
-        {
-            if (_isDisposed) return 0;
-
-            // Process any pending MIDI events
-            ProcessMidiEvents();
-
-            // Generate audio (placeholder - actual VST processing would happen here)
-            int samples = Math.Min(count, _outputBuffer.Length);
-
-            // For now, generate silence or pass through
-            // In real implementation, this would call the VST's processReplacing
-            for (int i = 0; i < samples; i++)
-            {
-                buffer[offset + i] = _outputBuffer[i % _outputBuffer.Length] * _masterVolume;
-            }
-
-            return samples;
-        }
-    }
-
-    /// <summary>
-    /// Process audio input through the VST effect
-    /// </summary>
-    public void ProcessInput(float[] input, float[] output, int sampleCount)
-    {
-        lock (_lock)
-        {
-            if (_isDisposed) return;
-
-            // Copy input to processing buffer
-            Array.Copy(input, _inputBuffer, Math.Min(input.Length, _inputBuffer.Length));
-
-            // Process MIDI events
-            ProcessMidiEvents();
-
-            // In real implementation, call VST's processReplacing with input/output
-            // For effects, input is processed and written to output
-            // For instruments, input is ignored and output is generated from MIDI
-
-            if (!IsInstrument)
-            {
-                // Effect: process input
-                for (int i = 0; i < sampleCount && i < output.Length; i++)
-                {
-                    output[i] = _inputBuffer[i % _inputBuffer.Length] * _masterVolume;
-                }
-            }
-            else
-            {
-                // Instrument: generate from MIDI (output buffer already filled by MIDI processing)
-                for (int i = 0; i < sampleCount && i < output.Length; i++)
-                {
-                    output[i] = _outputBuffer[i % _outputBuffer.Length] * _masterVolume;
-                }
-            }
-        }
-    }
-
-    private void ProcessMidiEvents()
-    {
-        while (_midiEventQueue.Count > 0)
-        {
-            var evt = _midiEventQueue.Dequeue();
-            // In real implementation, send to VST plugin via processEvents
-        }
-    }
-
-    public void Dispose()
-    {
-        if (_isDisposed) return;
-
-        lock (_lock)
-        {
-            _isDisposed = true;
-            AllNotesOff();
-
-            if (_pluginHandle != IntPtr.Zero)
-            {
-                // Unload the VST plugin
-                _pluginHandle = IntPtr.Zero;
-            }
-        }
-
-        GC.SuppressFinalize(this);
-    }
-}
-
-
-/// <summary>
-/// Central VST Host that manages plugin discovery, loading, and lifecycle
+/// Central VST Host that manages plugin discovery, loading, and lifecycle.
+/// Provides utilities for preset management and parameter discovery across plugins.
 /// </summary>
 public class VstHost : IDisposable
 {
@@ -427,7 +122,8 @@ public class VstHost : IDisposable
                 IsLoaded = false,
                 NumInputs = 2,
                 NumOutputs = 2,
-                NumParameters = 0
+                NumParameters = 0,
+                NumPrograms = 1
             };
         }
         catch
@@ -472,7 +168,8 @@ public class VstHost : IDisposable
                 IsLoaded = false,
                 NumInputs = 2,
                 NumOutputs = 2,
-                NumParameters = 0
+                NumParameters = 0,
+                NumPrograms = 1
             };
         }
         catch
@@ -665,6 +362,412 @@ public class VstHost : IDisposable
         }
         Console.WriteLine("==========================\n");
     }
+
+    #region Preset Loading Utilities
+
+    /// <summary>
+    /// Scan a directory for preset files (.fxp, .fxb) compatible with a plugin
+    /// </summary>
+    /// <param name="directory">Directory to scan</param>
+    /// <param name="pluginName">Optional plugin name to filter by (searches in subdirectories)</param>
+    /// <returns>List of preset file paths</returns>
+    public List<string> ScanForPresets(string directory, string? pluginName = null)
+    {
+        var presets = new List<string>();
+
+        if (!Directory.Exists(directory))
+        {
+            return presets;
+        }
+
+        try
+        {
+            // If plugin name specified, try to find plugin-specific folder first
+            if (!string.IsNullOrEmpty(pluginName))
+            {
+                var pluginDir = Path.Combine(directory, pluginName);
+                if (Directory.Exists(pluginDir))
+                {
+                    presets.AddRange(Directory.GetFiles(pluginDir, "*.fxp", SearchOption.AllDirectories));
+                    presets.AddRange(Directory.GetFiles(pluginDir, "*.fxb", SearchOption.AllDirectories));
+                }
+            }
+
+            // Also scan the main directory
+            presets.AddRange(Directory.GetFiles(directory, "*.fxp", SearchOption.AllDirectories));
+            presets.AddRange(Directory.GetFiles(directory, "*.fxb", SearchOption.AllDirectories));
+
+            // Remove duplicates
+            presets = presets.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error scanning for presets: {ex.Message}");
+        }
+
+        return presets;
+    }
+
+    /// <summary>
+    /// Get common preset directories for a platform
+    /// </summary>
+    /// <returns>List of common preset directories</returns>
+    public static List<string> GetCommonPresetDirectories()
+    {
+        var directories = new List<string>();
+
+        // Windows common preset locations
+        string? userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string? appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string? localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string? documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+
+        if (!string.IsNullOrEmpty(documents))
+        {
+            directories.Add(Path.Combine(documents, "VST Presets"));
+            directories.Add(Path.Combine(documents, "VST3 Presets"));
+            directories.Add(Path.Combine(documents, "Presets"));
+        }
+
+        if (!string.IsNullOrEmpty(appData))
+        {
+            directories.Add(Path.Combine(appData, "VST Presets"));
+            directories.Add(Path.Combine(appData, "VST3 Presets"));
+        }
+
+        // Steinberg standard location
+        directories.Add(@"C:\Users\Public\Documents\Steinberg\VST Presets");
+        directories.Add(@"C:\ProgramData\Steinberg\VST Presets");
+
+        return directories.Where(Directory.Exists).ToList();
+    }
+
+    /// <summary>
+    /// Load a preset file into a plugin by name
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <param name="presetPath">Path to the preset file</param>
+    /// <returns>True if successful</returns>
+    public bool LoadPresetForPlugin(string pluginName, string presetPath)
+    {
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            Console.WriteLine($"Plugin '{pluginName}' not loaded");
+            return false;
+        }
+
+        return plugin.LoadPreset(presetPath);
+    }
+
+    /// <summary>
+    /// Save a plugin's current state to a preset file
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <param name="presetPath">Path for the preset file</param>
+    /// <returns>True if successful</returns>
+    public bool SavePresetForPlugin(string pluginName, string presetPath)
+    {
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            Console.WriteLine($"Plugin '{pluginName}' not loaded");
+            return false;
+        }
+
+        return plugin.SavePreset(presetPath);
+    }
+
+    /// <summary>
+    /// Create a preset bank from multiple preset files
+    /// </summary>
+    /// <param name="presetPaths">List of .fxp preset file paths</param>
+    /// <param name="outputPath">Output .fxb bank file path</param>
+    /// <returns>True if successful</returns>
+    public bool CreatePresetBank(IEnumerable<string> presetPaths, string outputPath)
+    {
+        try
+        {
+            var presets = presetPaths.ToList();
+            if (presets.Count == 0)
+            {
+                Console.WriteLine("No presets provided for bank creation");
+                return false;
+            }
+
+            // Read and combine preset data (simplified implementation)
+            // Full implementation would parse and combine FXP files properly
+            using var output = File.Create(outputPath);
+            using var writer = new BinaryWriter(output);
+
+            // Write FXB header
+            uint chunkMagic = 0x4B6E6343; // 'CcnK'
+            uint bankMagic = 0x68436246;  // 'FBCh'
+
+            writer.Write(SwapEndian(chunkMagic));
+            // Size will be written at the end
+            long sizePosition = output.Position;
+            writer.Write(0); // Placeholder for size
+            writer.Write(SwapEndian(bankMagic));
+            writer.Write(SwapEndian(1u)); // Version
+            writer.Write(0); // FX ID (placeholder)
+            writer.Write(SwapEndian(1u)); // FX Version
+            writer.Write(SwapEndian((uint)presets.Count)); // Num programs
+
+            // Write current program (0)
+            writer.Write(SwapEndian(0u));
+
+            // Reserved (124 bytes)
+            writer.Write(new byte[124]);
+
+            // For each preset, read and write the program data
+            foreach (var presetPath in presets)
+            {
+                if (File.Exists(presetPath))
+                {
+                    var presetData = File.ReadAllBytes(presetPath);
+                    // Skip the header and write the program data
+                    if (presetData.Length > 60)
+                    {
+                        writer.Write(presetData, 28, presetData.Length - 28);
+                    }
+                }
+            }
+
+            // Go back and write the size
+            long endPosition = output.Position;
+            output.Position = sizePosition;
+            writer.Write(SwapEndian((uint)(endPosition - 8)));
+
+            Console.WriteLine($"Created preset bank: {outputPath}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error creating preset bank: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static uint SwapEndian(uint value)
+    {
+        return ((value & 0xFF) << 24) |
+               ((value & 0xFF00) << 8) |
+               ((value & 0xFF0000) >> 8) |
+               ((value & 0xFF000000) >> 24);
+    }
+
+    #endregion
+
+    #region Parameter Discovery Helpers
+
+    /// <summary>
+    /// Discover all parameters for a loaded plugin
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <returns>List of parameter info tuples (index, name, value, display)</returns>
+    public List<(int Index, string Name, float Value, string Display)> DiscoverParameters(string pluginName)
+    {
+        var parameters = new List<(int Index, string Name, float Value, string Display)>();
+
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            Console.WriteLine($"Plugin '{pluginName}' not loaded");
+            return parameters;
+        }
+
+        int count = plugin.GetParameterCount();
+        for (int i = 0; i < count; i++)
+        {
+            parameters.Add((
+                i,
+                plugin.GetParameterName(i),
+                plugin.GetParameterValue(i),
+                plugin.GetParameterDisplay(i)
+            ));
+        }
+
+        return parameters;
+    }
+
+    /// <summary>
+    /// Print all parameters for a plugin to console
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    public void PrintParameters(string pluginName)
+    {
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            Console.WriteLine($"Plugin '{pluginName}' not loaded");
+            return;
+        }
+
+        Console.WriteLine($"\n=== Parameters for {pluginName} ===");
+        int count = plugin.GetParameterCount();
+
+        if (count == 0)
+        {
+            Console.WriteLine("  No parameters available.");
+        }
+        else
+        {
+            for (int i = 0; i < count; i++)
+            {
+                string name = plugin.GetParameterName(i);
+                float value = plugin.GetParameterValue(i);
+                string display = plugin.GetParameterDisplay(i);
+                Console.WriteLine($"  [{i}] {name}: {display} ({value:F3})");
+            }
+        }
+        Console.WriteLine("==============================\n");
+    }
+
+    /// <summary>
+    /// Find parameters by name pattern
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <param name="pattern">Search pattern (case-insensitive)</param>
+    /// <returns>List of matching parameter indices</returns>
+    public List<int> FindParameters(string pluginName, string pattern)
+    {
+        var matches = new List<int>();
+
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            return matches;
+        }
+
+        int count = plugin.GetParameterCount();
+        for (int i = 0; i < count; i++)
+        {
+            string name = plugin.GetParameterName(i);
+            if (name.Contains(pattern, StringComparison.OrdinalIgnoreCase))
+            {
+                matches.Add(i);
+            }
+        }
+
+        return matches;
+    }
+
+    /// <summary>
+    /// Set multiple parameters at once
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <param name="parameters">Dictionary of parameter index to value</param>
+    public void SetParameters(string pluginName, Dictionary<int, float> parameters)
+    {
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            Console.WriteLine($"Plugin '{pluginName}' not loaded");
+            return;
+        }
+
+        foreach (var kvp in parameters)
+        {
+            plugin.SetParameterValue(kvp.Key, kvp.Value);
+        }
+    }
+
+    /// <summary>
+    /// Copy parameter values from one plugin to another (useful for A/B comparison)
+    /// </summary>
+    /// <param name="sourcePluginName">Source plugin name</param>
+    /// <param name="destPluginName">Destination plugin name</param>
+    /// <returns>Number of parameters copied</returns>
+    public int CopyParameters(string sourcePluginName, string destPluginName)
+    {
+        var source = GetPlugin(sourcePluginName);
+        var dest = GetPlugin(destPluginName);
+
+        if (source == null || dest == null)
+        {
+            Console.WriteLine("Source or destination plugin not loaded");
+            return 0;
+        }
+
+        int count = Math.Min(source.GetParameterCount(), dest.GetParameterCount());
+        for (int i = 0; i < count; i++)
+        {
+            dest.SetParameterValue(i, source.GetParameterValue(i));
+        }
+
+        Console.WriteLine($"Copied {count} parameters from {sourcePluginName} to {destPluginName}");
+        return count;
+    }
+
+    /// <summary>
+    /// Create a snapshot of all parameter values for a plugin
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <returns>Dictionary of parameter index to value</returns>
+    public Dictionary<int, float> CreateParameterSnapshot(string pluginName)
+    {
+        var snapshot = new Dictionary<int, float>();
+
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            return snapshot;
+        }
+
+        int count = plugin.GetParameterCount();
+        for (int i = 0; i < count; i++)
+        {
+            snapshot[i] = plugin.GetParameterValue(i);
+        }
+
+        return snapshot;
+    }
+
+    /// <summary>
+    /// Restore parameters from a snapshot
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <param name="snapshot">Parameter snapshot to restore</param>
+    public void RestoreParameterSnapshot(string pluginName, Dictionary<int, float> snapshot)
+    {
+        SetParameters(pluginName, snapshot);
+    }
+
+    /// <summary>
+    /// Randomize parameters within specified ranges
+    /// </summary>
+    /// <param name="pluginName">Name of the loaded plugin</param>
+    /// <param name="minValue">Minimum random value (0-1)</param>
+    /// <param name="maxValue">Maximum random value (0-1)</param>
+    /// <param name="excludeIndices">Parameter indices to exclude from randomization</param>
+    public void RandomizeParameters(string pluginName, float minValue = 0f, float maxValue = 1f, HashSet<int>? excludeIndices = null)
+    {
+        var plugin = GetPlugin(pluginName);
+        if (plugin == null)
+        {
+            Console.WriteLine($"Plugin '{pluginName}' not loaded");
+            return;
+        }
+
+        var random = new Random();
+        int count = plugin.GetParameterCount();
+
+        for (int i = 0; i < count; i++)
+        {
+            if (excludeIndices != null && excludeIndices.Contains(i))
+            {
+                continue;
+            }
+
+            float value = minValue + (float)(random.NextDouble() * (maxValue - minValue));
+            plugin.SetParameterValue(i, value);
+        }
+
+        Console.WriteLine($"Randomized {count} parameters for {pluginName}");
+    }
+
+    #endregion
 
     public void Dispose()
     {

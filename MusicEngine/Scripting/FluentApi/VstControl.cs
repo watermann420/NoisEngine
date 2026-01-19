@@ -143,6 +143,116 @@ public class VstPluginControl
         return this;
     }
 
+    // === Preset Management ===
+
+    // Load a preset from file
+    public VstPluginControl loadPreset(string path)
+    {
+        _plugin.LoadPreset(path);
+        return this;
+    }
+
+    // Save current state to preset file
+    public VstPluginControl savePreset(string path)
+    {
+        _plugin.SavePreset(path);
+        return this;
+    }
+
+    // Set preset by index
+    public VstPluginControl preset(int index)
+    {
+        _plugin.SetPreset(index);
+        return this;
+    }
+
+    // Get current preset name
+    public string currentPreset => _plugin.CurrentPresetName;
+
+    // Get all preset names
+    public IReadOnlyList<string> presets => _plugin.GetPresetNames();
+
+    // List all available presets
+    public VstPluginControl listPresets()
+    {
+        var names = _plugin.GetPresetNames();
+        Console.WriteLine($"\n=== Presets for {_plugin.Name} ===");
+        for (int i = 0; i < names.Count; i++)
+        {
+            var current = i == _plugin.CurrentPresetIndex ? " [CURRENT]" : "";
+            Console.WriteLine($"  [{i}] {names[i]}{current}");
+        }
+        Console.WriteLine("==============================\n");
+        return this;
+    }
+
+    // === Parameter Methods ===
+
+    // Get parameter count
+    public int paramCount => _plugin.GetParameterCount();
+
+    // Get parameter name by index
+    public string paramName(int index) => _plugin.GetParameterName(index);
+
+    // Get parameter value by index
+    public float paramValue(int index) => _plugin.GetParameterValue(index);
+
+    // Get parameter display string by index
+    public string paramDisplay(int index) => _plugin.GetParameterDisplay(index);
+
+    // List all parameters
+    public VstPluginControl listParams()
+    {
+        Console.WriteLine($"\n=== Parameters for {_plugin.Name} ===");
+        int count = _plugin.GetParameterCount();
+        if (count == 0)
+        {
+            Console.WriteLine("  No parameters available.");
+        }
+        else
+        {
+            for (int i = 0; i < count; i++)
+            {
+                string name = _plugin.GetParameterName(i);
+                string display = _plugin.GetParameterDisplay(i);
+                float value = _plugin.GetParameterValue(i);
+                Console.WriteLine($"  [{i}] {name}: {display} ({value:F3})");
+            }
+        }
+        Console.WriteLine("==============================\n");
+        return this;
+    }
+
+    // === Parameter Automation ===
+
+    // Create automation ramp for a parameter
+    public VstPluginControl automate(int paramIndex, float startValue, float endValue, double durationBeats)
+    {
+        _plugin.AutomateParameter(paramIndex, startValue, endValue, durationBeats);
+        return this;
+    }
+
+    // Clear automation for a parameter
+    public VstPluginControl clearAutomation(int paramIndex)
+    {
+        _plugin.ClearAutomation(paramIndex);
+        return this;
+    }
+
+    // Clear all automation
+    public VstPluginControl clearAllAutomation()
+    {
+        _plugin.ClearAllAutomation();
+        return this;
+    }
+
+    // Set current time for automation playback
+    public VstPluginControl setTime(double beats)
+    {
+        _plugin.SetCurrentTimeBeats(beats);
+        return this;
+    }
+
     // Implicit conversion to VstPlugin for direct use
     public static implicit operator VstPlugin(VstPluginControl control) => control._plugin;
 }
