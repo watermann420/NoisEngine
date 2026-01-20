@@ -29,10 +29,22 @@ public class VirtualChannelControl
         return new VirtualChannelBuilder(channel);
     }
 
+    /// <summary>Alias for create - PascalCase version</summary>
+    public VirtualChannelBuilder Create(string name) => create(name);
+    /// <summary>Alias for create - Creates a new virtual channel</summary>
+    public VirtualChannelBuilder @new(string name) => create(name);
+    /// <summary>Alias for create - Makes a new virtual channel</summary>
+    public VirtualChannelBuilder make(string name) => create(name);
+
     /// <summary>
     /// Lists all virtual channels.
     /// </summary>
     public void list() => _globals.ListVirtualChannels();
+
+    /// <summary>Alias for list - PascalCase version</summary>
+    public void List() => list();
+    /// <summary>Alias for list - Shows all virtual channels</summary>
+    public void show() => list();
 }
 
 /// <summary>

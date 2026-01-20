@@ -46,7 +46,9 @@ Sequencer.Start();
 
 ## 2. Synth Creation
 
-### CreateSynth()
+### CreateSynth
+
+**Aliases:** `CreateSynth()`, `synth()`, `s()`, `newSynth()`
 
 Creates a new `SimpleSynth` and automatically adds it to the audio engine.
 
@@ -56,7 +58,9 @@ SimpleSynth CreateSynth()
 
 **Returns:** A new `SimpleSynth` instance
 
-### CreatePattern(synth)
+### CreatePattern
+
+**Aliases:** `CreatePattern(synth)`
 
 Creates a new `Pattern` for a synthesizer and adds it to the sequencer.
 
@@ -93,7 +97,9 @@ Start();
 
 The Sample Instrument API enables the creation of sample-based synthesizers.
 
-### CreateSampler(name?)
+### CreateSampler
+
+**Aliases:** `CreateSampler(name)`, `samples.create(name)`
 
 Creates a new `SampleInstrument` and adds it to the audio engine.
 
@@ -106,7 +112,9 @@ SampleInstrument CreateSampler(string? name = null)
 
 **Returns:** A new `SampleInstrument` instance
 
-### CreateSamplerFromFile(filePath, rootNote?)
+### CreateSamplerFromFile
+
+**Aliases:** `CreateSamplerFromFile(filePath, rootNote)`, `samples.load(filePath, rootNote)`
 
 Creates a sampler and loads a single audio file. The sample is mapped to all notes with pitch-shifting from the root note.
 
@@ -120,7 +128,9 @@ SampleInstrument CreateSamplerFromFile(string filePath, int rootNote = 60)
 
 **Returns:** A new `SampleInstrument` instance
 
-### CreateSamplerFromDirectory(directoryPath)
+### CreateSamplerFromDirectory
+
+**Aliases:** `CreateSamplerFromDirectory(directoryPath)`, `samples.fromDirectory(directoryPath)`
 
 Creates a sampler and loads all samples from a directory.
 
@@ -133,7 +143,9 @@ SampleInstrument CreateSamplerFromDirectory(string directoryPath)
 
 **Returns:** A new `SampleInstrument` instance
 
-### LoadSampleToNote(sampler, filePath, note)
+### LoadSampleToNote
+
+**Aliases:** `LoadSampleToNote(sampler, filePath, note)`
 
 Loads a sample into an existing sampler and maps it to a specific note. Ideal for drum pads.
 
@@ -174,7 +186,9 @@ Start();
 
 Functions for controlling playback.
 
-### Start()
+### Start
+
+**Aliases:** `Start()`, `play()`, `run()`, `go()`
 
 Starts the sequencer.
 
@@ -182,7 +196,9 @@ Starts the sequencer.
 void Start()
 ```
 
-### Stop()
+### Stop
+
+**Aliases:** `Stop()`, `pause()`, `halt()`
 
 Stops the sequencer.
 
@@ -190,7 +206,9 @@ Stops the sequencer.
 void Stop()
 ```
 
-### SetBpm(bpm)
+### SetBpm
+
+**Aliases:** `SetBpm(bpm)`, `SetBPM(bpm)`, `bpm(bpm)`, `tempo(bpm)`
 
 Sets the tempo in beats per minute.
 
@@ -201,7 +219,9 @@ void SetBpm(double bpm)
 **Parameters:**
 - `bpm` - Tempo in BPM (e.g. 120.0)
 
-### Skip(beats)
+### Skip
+
+**Aliases:** `Skip(beats)`, `jump(beats)`, `seek(beats)`
 
 Skips forward or backward by a specific number of beats.
 
@@ -212,7 +232,9 @@ void Skip(double beats)
 **Parameters:**
 - `beats` - Number of beats (positive = forward, negative = backward)
 
-### SetScratching(scratching)
+### SetScratching
+
+**Aliases:** `SetScratching(scratching)`
 
 Enables or disables scratching mode.
 
@@ -241,7 +263,9 @@ Stop();
 
 Functions for controlling individual patterns.
 
-### StartPattern(pattern)
+### StartPattern
+
+**Aliases:** `StartPattern(pattern)`, `patterns.start(pattern)`
 
 Starts a specific pattern.
 
@@ -249,7 +273,9 @@ Starts a specific pattern.
 void StartPattern(Pattern p)
 ```
 
-### StopPattern(pattern)
+### StopPattern
+
+**Aliases:** `StopPattern(pattern)`, `patterns.stop(pattern)`
 
 Stops a specific pattern.
 
@@ -258,6 +284,8 @@ void StopPattern(Pattern p)
 ```
 
 ### patterns Object
+
+**Aliases:** `patterns.start(pattern)`, `patterns.stop(pattern)`, `patterns.toggle(pattern)`
 
 Access to extended pattern control:
 
@@ -295,9 +323,13 @@ The MIDI API provides a fluent syntax for MIDI configuration.
 
 ### midi Object
 
+**Aliases:** `midi.device(index)`, `midi.input(index)` (for input devices), `midi.output(index)` (for output devices)
+
 Main entry point for all MIDI operations.
 
 ### Device Access
+
+**Aliases:** `midi.device(0)` or `midi.input(0)` for MIDI input; `midi.output(0)` for MIDI output
 
 ```csharp
 // By index
@@ -311,12 +343,16 @@ midi.input("Arturia KeyLab")      // Alias for device()
 
 ### MIDI Routing
 
+**Aliases:** `midi.device(index).route(synth)`
+
 ```csharp
 // Route MIDI to synth
 midi.device(0).route(synth)       // All notes from device to synth
 ```
 
 ### Control Change (CC) Mapping
+
+**Aliases:** `midi.device(index).cc(number).to(synth, parameter)`
 
 ```csharp
 // Map CC to parameter
@@ -327,12 +363,16 @@ midi.device(0).cc(74).to(synth, "filterRes")     // CC74 to resonance
 
 ### Pitch Bend Mapping
 
+**Aliases:** `midi.device(index).pitchbend().to(synth, parameter)`
+
 ```csharp
 // Map pitch bend to parameter
 midi.device(0).pitchbend().to(synth, "pitch")
 ```
 
 ### Playable Keys (Key Ranges)
+
+**Aliases:** `midi.playablekeys.range(start, end).map(synth)`, `midi.playablekeys.range(start, end).from(index).map(synth)`
 
 ```csharp
 // Map key range to synth
@@ -350,6 +390,8 @@ midi.playablekeys.range(21, 108).high_to_low().map(synth)
 ```
 
 ### MIDI Output
+
+**Aliases:** `midi.output(index).noteOn(note, velocity, channel)`, `midi.output(index).noteOff(note, channel)`, `midi.output(index).cc(controller, value, channel)`
 
 ```csharp
 // MIDI output by index or name
@@ -391,9 +433,13 @@ Functions for controlling audio output.
 
 ### audio Object
 
+**Aliases:** `audio.channel(index).gain(value)`, `audio.all.gain(value)`, `audio.input(index).onFrequency(low, high).threshold(value).trigger(action)`
+
 Main entry point for audio control.
 
 ### Channel Volume
+
+**Aliases:** `audio.channel(index).gain(value)`, `audio.all.gain(value)`
 
 ```csharp
 // Single channel
@@ -405,6 +451,8 @@ audio.all.gain(0.5)           // Master volume to 50%
 ```
 
 ### Audio Input (Frequency Triggers)
+
+**Aliases:** `audio.input(index).onFrequency(low, high).threshold(value).trigger(action)`, `AddFrequencyTrigger(deviceIndex, low, high, threshold, action)`
 
 ```csharp
 // Monitor frequency range
@@ -444,9 +492,13 @@ Functions for loading and controlling VST plugins.
 
 ### vst Object
 
+**Aliases:** `vst.load(name)`, `vst.get(name)`, `vst.plugin(name)`, `vst.list()`, `vst.loaded()`
+
 Main entry point for VST operations.
 
 ### Plugin Management
+
+**Aliases:** `vst.list()` or `ListVstPlugins()`; `vst.loaded()` or `ListLoadedVstPlugins()`
 
 ```csharp
 // List available plugins
@@ -455,6 +507,8 @@ vst.loaded()                  // Output all loaded plugins
 ```
 
 ### Load Plugin
+
+**Aliases:** `vst.load(name)`, `LoadVst(name)`, `LoadVstByIndex(index)`
 
 ```csharp
 // By name or path
@@ -467,6 +521,8 @@ var plugin = vst.load(0)                                // First plugin
 
 ### Get Plugin
 
+**Aliases:** `vst.get(name)`, `vst.plugin(name)`, `GetVst(name)`
+
 ```csharp
 // Get already loaded plugin
 var serum = vst.get("Serum")
@@ -474,6 +530,8 @@ var serum = vst.plugin("Serum")    // Alias
 ```
 
 ### Plugin Control (Fluent API)
+
+**Aliases:** `plugin.from(index)`, `plugin.param(name, value)`, `plugin.volume(value)`, `plugin.noteOn(note, velocity)`, `plugin.noteOff(note)`, `plugin.allNotesOff()`, `plugin.cc(controller, value, channel)`, `plugin.program(number, channel)`, `plugin.pitchBend(value, channel)`
 
 ```csharp
 // MIDI routing
@@ -498,6 +556,8 @@ plugin.pitchBend(8192)             // Pitch bend (center = 8192)
 ```
 
 ### Direct Functions
+
+**Aliases:** `LoadVst(name)`, `LoadVstByIndex(index)`, `GetVst(name)`, `RouteToVst(deviceIndex, plugin)`, `ListVstPlugins()`, `ListLoadedVstPlugins()`
 
 ```csharp
 // Alternative direct calls
@@ -542,9 +602,13 @@ The Sample Fluent API provides an elegant syntax for sample instruments.
 
 ### samples Object
 
+**Aliases:** `samples.create(name)`, `samples.load(filePath, rootNote)`, `samples.fromDirectory(directoryPath)`
+
 Main entry point for sample operations.
 
 ### Create Sampler
+
+**Aliases:** `samples.create(name)`, `CreateSampler(name)`
 
 ```csharp
 // Create empty sampler
@@ -554,6 +618,8 @@ var sampler = samples.create("MySampler")    // With name
 
 ### Load Sample
 
+**Aliases:** `samples.load(filePath, rootNote)`, `CreateSamplerFromFile(filePath, rootNote)`
+
 ```csharp
 // Single sample as instrument
 var piano = samples.load("C:/Samples/piano.wav")           // Default root = C4 (60)
@@ -562,12 +628,16 @@ var piano = samples.load("C:/Samples/piano.wav", 48)       // Root = C3 (48)
 
 ### Load from Directory
 
+**Aliases:** `samples.fromDirectory(directoryPath)`, `CreateSamplerFromDirectory(directoryPath)`
+
 ```csharp
 // All samples from a folder
 var kit = samples.fromDirectory("C:/Samples/DrumKit/")
 ```
 
 ### Builder Methods (chainable)
+
+**Aliases:** `.map(filePath, note)`, `.directory(path)`, `.volume(value)`, `.name(name)`, `.pattern()`
 
 ```csharp
 // Map sample to note
@@ -640,7 +710,9 @@ Start();
 
 Useful helpers for scripts.
 
-### Print(message)
+### Print
+
+**Aliases:** `Print(message)`
 
 Outputs a message to the console.
 
@@ -648,7 +720,9 @@ Outputs a message to the console.
 void Print(string message)
 ```
 
-### Random(min, max)
+### Random
+
+**Aliases:** `Random(min, max)`
 
 Generates a random floating-point number.
 
@@ -656,7 +730,9 @@ Generates a random floating-point number.
 float Random(float min, float max)
 ```
 
-### RandomInt(min, max)
+### RandomInt
+
+**Aliases:** `RandomInt(min, max)`
 
 Generates a random integer.
 
@@ -694,6 +770,8 @@ Start();
 Advanced functions for frequency-based triggers from audio inputs.
 
 ### AddFrequencyTrigger
+
+**Aliases:** `AddFrequencyTrigger(deviceIndex, low, high, threshold, action)`, `audio.input(deviceIndex).onFrequency(low, high).threshold(value).trigger(action)`
 
 Adds a frequency trigger that responds to specific frequency ranges.
 
@@ -751,7 +829,9 @@ Start();
 
 Functions for mapping MIDI controllers to transport functions.
 
-### MapBpm(deviceIndex, cc)
+### MapBpm
+
+**Aliases:** `MapBpm(deviceIndex, cc)`
 
 Maps a MIDI CC to BPM control (60-200 BPM).
 
@@ -759,7 +839,9 @@ Maps a MIDI CC to BPM control (60-200 BPM).
 void MapBpm(int deviceIndex, int cc)
 ```
 
-### MapStart(deviceIndex, note)
+### MapStart
+
+**Aliases:** `MapStart(deviceIndex, note)`
 
 Maps a MIDI note to start the sequencer.
 
@@ -767,7 +849,9 @@ Maps a MIDI note to start the sequencer.
 void MapStart(int deviceIndex, int note)
 ```
 
-### MapStop(deviceIndex, note)
+### MapStop
+
+**Aliases:** `MapStop(deviceIndex, note)`
 
 Maps a MIDI note to stop the sequencer.
 
@@ -775,7 +859,9 @@ Maps a MIDI note to stop the sequencer.
 void MapStop(int deviceIndex, int note)
 ```
 
-### MapSkip(deviceIndex, cc, beats)
+### MapSkip
+
+**Aliases:** `MapSkip(deviceIndex, cc, beats)`
 
 Maps a MIDI CC to skip beats.
 
@@ -783,7 +869,9 @@ Maps a MIDI CC to skip beats.
 void MapSkip(int deviceIndex, int cc, double beats)
 ```
 
-### MapScratch(deviceIndex, cc, scale)
+### MapScratch
+
+**Aliases:** `MapScratch(deviceIndex, cc, scale)`
 
 Maps a MIDI CC for scratching behavior.
 
@@ -812,7 +900,9 @@ Start();
 
 Lower level for direct MIDI routing.
 
-### RouteMidi(deviceIndex, synth)
+### RouteMidi
+
+**Aliases:** `RouteMidi(deviceIndex, synth)`, `midi.device(deviceIndex).route(synth)`
 
 Routes MIDI input directly to a synthesizer.
 
@@ -820,7 +910,9 @@ Routes MIDI input directly to a synthesizer.
 void RouteMidi(int deviceIndex, ISynth synth)
 ```
 
-### MapControl(deviceIndex, cc, synth, param)
+### MapControl
+
+**Aliases:** `MapControl(deviceIndex, cc, synth, param)`, `midi.device(deviceIndex).cc(cc).to(synth, param)`
 
 Maps a MIDI CC directly to a synth parameter.
 
@@ -828,7 +920,9 @@ Maps a MIDI CC directly to a synth parameter.
 void MapControl(int deviceIndex, int cc, ISynth synth, string param)
 ```
 
-### MapPitchBend(deviceIndex, synth, param)
+### MapPitchBend
+
+**Aliases:** `MapPitchBend(deviceIndex, synth, param)`, `midi.device(deviceIndex).pitchbend().to(synth, param)`
 
 Maps pitch bend to a synth parameter.
 
@@ -933,9 +1027,13 @@ The Virtual Audio Channel API enables routing audio to other applications via Na
 
 ### virtualChannels Object
 
+**Aliases:** `virtualChannels.create(name)`, `virtualChannels.list()`
+
 Main entry point for Virtual Audio Channel operations.
 
 ### Create Channel
+
+**Aliases:** `virtualChannels.create(name)`, `CreateVirtualChannel(name)`
 
 ```csharp
 // Create new virtual channel
@@ -949,12 +1047,16 @@ var channel = virtualChannels.create("Output")
 
 ### List Channels
 
+**Aliases:** `virtualChannels.list()`, `ListVirtualChannels()`
+
 ```csharp
 // Show all virtual channels
 virtualChannels.list()
 ```
 
 ### Builder Methods
+
+**Aliases:** `.volume(value)`, `.start()`, `.stop()`, `.pipeName`
 
 ```csharp
 // Set volume
@@ -981,6 +1083,8 @@ VirtualAudioChannel channel = virtualChannels.create("Audio");
 ```
 
 ### Direct Functions
+
+**Aliases:** `CreateVirtualChannel(name)`, `ListVirtualChannels()`
 
 ```csharp
 // Alternative direct calls

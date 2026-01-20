@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Pattern functions, note events, sequencer control
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== PATTERN CREATION TEST ===");
 Print("");
 
@@ -22,8 +30,14 @@ Print("");
 // ============================================================================
 Print("2. Creating simple pattern:");
 
+// Original syntax:
 var pattern1 = CreatePattern(bass, "simple-bass");
 pattern1.Loop = true;
+
+// Alias options (all work the same):
+// var pattern1 = pattern(bass, "simple-bass");      // Short name
+// var pattern1 = p(bass, "simple-bass");            // Very short
+// var pattern1 = newPattern(bass, "simple-bass");   // Semantic name
 
 // Add notes: AddNote(beat, note, velocity, duration)
 pattern1.AddNote(0.0, 36, 100, 0.5);   // C2 on beat 0
@@ -121,10 +135,25 @@ Print("");
 Print("=== PATTERN CREATION TEST COMPLETED ===");
 
 // ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// CreateSynth → synth, s, newSynth
+// CreatePattern → pattern, p, newPattern
+//   var pattern = CreatePattern(synth, "name");   // Original
+//   var pattern = pattern(synth, "name");         // Alias
+//   var pattern = p(synth, "name");               // Alias (very short)
+//   var pattern = newPattern(synth, "name");      // Alias (semantic)
+//
+// Print → log, write
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
+
+// ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:
 // ============================================================================
 // PATTERN FUNCTIONS:
-// - CreatePattern (could be: pattern, newPattern, makePattern, addPattern)
+// - CreatePattern (could be: pattern, newPattern, makePattern, addPattern) [IMPLEMENTED]
 // - AddNote (could be: note, addNote, add, n)
 // - RemoveNote (could be: removeNote, remove, delete, del)
 // - Clear (could be: clear, reset, empty, removeAll)

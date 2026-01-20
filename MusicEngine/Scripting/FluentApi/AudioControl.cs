@@ -19,9 +19,29 @@ public class AudioControl
     public AudioControl(ScriptGlobals globals) => _globals = globals; // Constructor
 
     public ChannelControl channel(int index) => new ChannelControl(_globals.Engine, index); // Access specific channel control
+
+    /// <summary>Alias for channel - PascalCase version</summary>
+    public ChannelControl Channel(int index) => channel(index);
+    /// <summary>Alias for channel - Short form</summary>
+    public ChannelControl ch(int index) => channel(index);
+    /// <summary>Alias for channel - Audio track control</summary>
+    public ChannelControl track(int index) => channel(index);
+
     public AllChannelsControl all => new AllChannelsControl(_globals.Engine); // Access all channels control
 
+    /// <summary>Alias for all - PascalCase version</summary>
+    public AllChannelsControl All => all;
+    /// <summary>Alias for all - Access all audio channels</summary>
+    public AllChannelsControl allChannels => all;
+
     public InputControl input(int index) => new InputControl(_globals, index); // Access audio input control
+
+    /// <summary>Alias for input - PascalCase version</summary>
+    public InputControl Input(int index) => input(index);
+    /// <summary>Alias for input - Short form</summary>
+    public InputControl @in(int index) => input(index);
+    /// <summary>Alias for input - Audio capture control</summary>
+    public InputControl capture(int index) => input(index);
 }
 
 // Control for audio input frequency triggers

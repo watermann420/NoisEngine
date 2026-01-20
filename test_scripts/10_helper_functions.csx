@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Print, random functions, utility helpers
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== HELPER FUNCTIONS TEST ===");
 Print("");
 
@@ -13,9 +21,15 @@ Print("");
 // ============================================================================
 Print("1. Print function:");
 
+// Original syntax:
 Print("   Simple message");
 Print($"   Formatted message: {1 + 1}");
 Print($"   Current time: {DateTime.Now}");
+
+// Alias options (all work the same):
+// log("Simple message");      // Alias
+// write("Simple message");    // Alias
+
 Print("");
 
 // ============================================================================
@@ -225,10 +239,54 @@ Print("");
 Print("=== HELPER FUNCTIONS TEST COMPLETED ===");
 
 // ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// CreateSynth → synth, s, newSynth
+//   var synth = CreateSynth("bass");    // Original
+//   var synth = synth("bass");          // Alias
+//   var synth = s("bass");              // Alias (very short)
+//   var synth = newSynth("bass");       // Alias (semantic)
+//
+// CreatePattern → pattern, p, newPattern
+//   var pattern = CreatePattern(synth, "name");   // Original
+//   var pattern = pattern(synth, "name");         // Alias
+//   var pattern = p(synth, "name");               // Alias (very short)
+//   var pattern = newPattern(synth, "name");      // Alias (semantic)
+//
+// Start → play, run, go
+//   Start();    // Original
+//   play();     // Alias
+//   run();      // Alias
+//   go();       // Alias
+//
+// Stop → pause, halt
+//   Stop();     // Original
+//   pause();    // Alias
+//   halt();     // Alias
+//
+// SetBpm → bpm, tempo
+//   SetBpm(120);    // Original
+//   bpm(120);       // Alias
+//   tempo(120);     // Alias
+//
+// Skip → jump, seek
+//   Skip(4);    // Original
+//   jump(4);    // Alias
+//   seek(4);    // Alias
+//
+// Print → log, write
+//   Print("Hello");    // Original
+//   log("Hello");      // Alias
+//   write("Hello");    // Alias
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
+
+// ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:
 // ============================================================================
 // PRINT FUNCTION:
-// - Print (could be: print, log, console, write, output, echo)
+// - Print (could be: print, log, console, write, output, echo) [IMPLEMENTED]
 //
 // RANDOM FUNCTIONS:
 // - Random() (could be: random, rand, rnd, rng, randomFloat)

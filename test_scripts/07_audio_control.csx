@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Audio functions, volume control, input routing
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== AUDIO CONTROL TEST ===");
 Print("");
 
@@ -161,6 +169,20 @@ Print("   → Callback receives magnitude value");
 Print("");
 
 Print("=== AUDIO CONTROL TEST COMPLETED ===");
+
+// ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// CreateSynth → synth, s, newSynth
+// CreatePattern → pattern, p, newPattern
+// Start → play, run, go
+// Stop → pause, halt
+// SetBpm → bpm, tempo
+// Skip → jump, seek
+// Print → log, write
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
 
 // ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:

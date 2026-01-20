@@ -32,6 +32,19 @@ public class VstControl
         return plugin != null ? new VstPluginControl(_globals, plugin) : null;
     }
 
+    /// <summary>Alias for load - PascalCase version</summary>
+    public VstPluginControl? Load(string nameOrPath) => load(nameOrPath);
+    /// <summary>Alias for load - PascalCase version</summary>
+    public VstPluginControl? Load(int index) => load(index);
+    /// <summary>Alias for load - Loads a VST plugin</summary>
+    public VstPluginControl? LoadPlugin(string nameOrPath) => load(nameOrPath);
+    /// <summary>Alias for load - Loads a VST plugin</summary>
+    public VstPluginControl? LoadPlugin(int index) => load(index);
+    /// <summary>Alias for load - Short form</summary>
+    public VstPluginControl? l(string nameOrPath) => load(nameOrPath);
+    /// <summary>Alias for load - Short form</summary>
+    public VstPluginControl? l(int index) => load(index);
+
     // Get a loaded VST plugin by name
     public VstPluginControl? get(string name)
     {
@@ -39,14 +52,26 @@ public class VstControl
         return plugin != null ? new VstPluginControl(_globals, plugin) : null;
     }
 
+    /// <summary>Alias for get - PascalCase version</summary>
+    public VstPluginControl? Get(string name) => get(name);
+    /// <summary>Alias for get - Access VST plugin by name</summary>
+    public VstPluginControl? plugin(string name) => get(name);
+
     // List all discovered VST plugins
     public void list() => _globals.ListVstPlugins();
+
+    /// <summary>Alias for list - PascalCase version</summary>
+    public void List() => list();
+    /// <summary>Alias for list - Show all VST plugins</summary>
+    public void plugins() => list();
 
     // List all loaded VST plugins
     public void loaded() => _globals.ListLoadedVstPlugins();
 
-    // Access VST plugin by name for fluent chaining
-    public VstPluginControl? plugin(string name) => get(name);
+    /// <summary>Alias for loaded - PascalCase version</summary>
+    public void Loaded() => loaded();
+    /// <summary>Alias for loaded - Show active VST plugins</summary>
+    public void active() => loaded();
 }
 
 

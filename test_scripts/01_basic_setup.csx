@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Variable names, initialization patterns
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 // Available global variables (automatically provided):
 // - Engine : AudioEngine instance
 // - Sequencer : Sequencer instance
@@ -49,10 +57,21 @@ Print("");
 Print("=== BASIC SETUP TEST COMPLETED ===");
 
 // ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// Print → log, write
+//   Print("Hello");          // Original
+//   log("Hello");            // Alias
+//   write("Hello");          // Alias
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
+
+// ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:
 // ============================================================================
 // - Engine (could be: audio, engine, sound, output)
 // - Sequencer (could be: seq, sequence, timeline, clock)
-// - Print (could be: log, console, write, output)
+// - Print (could be: log, console, write, output) [PARTIALLY IMPLEMENTED]
 // - Settings (could be: config, cfg, setup)
 // ============================================================================

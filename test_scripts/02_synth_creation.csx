@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Function names, parameter names, waveform types
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== SYNTH CREATION TEST ===");
 Print("");
 
@@ -13,8 +21,14 @@ Print("");
 // ============================================================================
 Print("1. Creating synths with different waveforms:");
 
+// Original syntax:
 var sine = CreateSynth("sine");
 Print($"   Created: {sine.Name} (Sine wave - default)");
+
+// Alias options (all work the same):
+// var sine = synth("sine");      // Short name
+// var sine = s("sine");          // Very short
+// var sine = newSynth("sine");   // Semantic name
 
 var square = CreateSynth("square", SynthWaveform.Square);
 Print($"   Created: {square.Name} (Square wave)");
@@ -88,10 +102,27 @@ Print("");
 Print("=== SYNTH CREATION TEST COMPLETED ===");
 
 // ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// CreateSynth → synth, s, newSynth
+//   var synth = CreateSynth("bass");    // Original
+//   var synth = synth("bass");          // Alias
+//   var synth = s("bass");              // Alias (very short)
+//   var synth = newSynth("bass");       // Alias (semantic)
+//
+// Print → log, write
+//   Print("Hello");                     // Original
+//   log("Hello");                       // Alias
+//   write("Hello");                     // Alias
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
+
+// ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:
 // ============================================================================
 // FUNCTION NAMES:
-// - CreateSynth (could be: synth, newSynth, makeSynth, addSynth)
+// - CreateSynth (could be: synth, newSynth, makeSynth, addSynth) [IMPLEMENTED]
 //
 // WAVEFORM TYPES:
 // - SynthWaveform.Sine (could be: sin, sine)

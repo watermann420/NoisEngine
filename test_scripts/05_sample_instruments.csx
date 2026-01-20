@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Sample functions, file loading, sample mapping
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== SAMPLE INSTRUMENTS TEST ===");
 Print("");
 
@@ -158,6 +166,20 @@ Print($"   Created pattern with {drumPattern.NoteCount} notes");
 Print("");
 
 Print("=== SAMPLE INSTRUMENTS TEST COMPLETED ===");
+
+// ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// CreateSynth → synth, s, newSynth
+// CreatePattern → pattern, p, newPattern
+// Start → play, run, go
+// Stop → pause, halt
+// SetBpm → bpm, tempo
+// Skip → jump, seek
+// Print → log, write
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
 
 // ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:

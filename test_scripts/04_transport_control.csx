@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: Transport commands, tempo control, beat navigation
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== TRANSPORT CONTROL TEST ===");
 Print("");
 
@@ -13,15 +21,27 @@ Print("");
 // ============================================================================
 Print("1. Basic transport control:");
 
+// Original syntax:
 Start();
 Print("   Start() - sequencer started");
 Print($"   IsPlaying: {Sequencer.IsPlaying}");
 
+// Alias options (all work the same):
+// play();     // Alias
+// run();      // Alias
+// go();       // Alias
+
 await Task.Delay(1000);
 
+// Original syntax:
 Stop();
 Print("   Stop() - sequencer stopped");
 Print($"   IsPlaying: {Sequencer.IsPlaying}");
+
+// Alias options (all work the same):
+// pause();    // Alias
+// halt();     // Alias
+
 Print("");
 
 // ============================================================================
@@ -31,9 +51,14 @@ Print("2. Tempo (BPM) control:");
 
 Print($"   Current BPM: {Sequencer.Bpm}");
 
+// Original syntax:
 SetBpm(120);
 Print($"   SetBpm(120) - set to 120 BPM");
 Print($"   Current BPM: {Sequencer.Bpm}");
+
+// Alias options (all work the same):
+// bpm(120);    // Alias
+// tempo(120);  // Alias
 
 SetBpm(140);
 Print($"   SetBpm(140) - set to 140 BPM");
@@ -49,9 +74,14 @@ Print("3. Beat position control:");
 
 Print($"   Current beat: {Sequencer.CurrentBeat}");
 
+// Original syntax:
 Skip(4);
 Print("   Skip(4) - jump forward 4 beats");
 Print($"   Current beat: {Sequencer.CurrentBeat}");
+
+// Alias options (all work the same):
+// jump(4);    // Alias
+// seek(4);    // Alias
 
 Skip(-2);
 Print("   Skip(-2) - jump backward 2 beats");
@@ -148,13 +178,44 @@ Print("");
 Print("=== TRANSPORT CONTROL TEST COMPLETED ===");
 
 // ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// Start → play, run, go
+//   Start();    // Original
+//   play();     // Alias
+//   run();      // Alias
+//   go();       // Alias
+//
+// Stop → pause, halt
+//   Stop();     // Original
+//   pause();    // Alias
+//   halt();     // Alias
+//
+// SetBpm → bpm, tempo
+//   SetBpm(120);    // Original
+//   bpm(120);       // Alias
+//   tempo(120);     // Alias
+//
+// Skip → jump, seek
+//   Skip(4);    // Original
+//   jump(4);    // Alias
+//   seek(4);    // Alias
+//
+// Print → log, write
+// CreateSynth → synth, s, newSynth
+// CreatePattern → pattern, p, newPattern
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
+
+// ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:
 // ============================================================================
 // TRANSPORT FUNCTIONS:
-// - Start (could be: start, play, run, go, begin)
-// - Stop (could be: stop, pause, halt, end)
-// - SetBpm (could be: bpm, tempo, setBpm, setTempo, speed)
-// - Skip (could be: skip, jump, seek, move, goto)
+// - Start (could be: start, play, run, go, begin) [IMPLEMENTED]
+// - Stop (could be: stop, pause, halt, end) [IMPLEMENTED]
+// - SetBpm (could be: bpm, tempo, setBpm, setTempo, speed) [IMPLEMENTED]
+// - Skip (could be: skip, jump, seek, move, goto) [IMPLEMENTED]
 //
 // PATTERN CONTROL FUNCTIONS:
 // - StartPattern (could be: startPattern, playPattern, runPattern)

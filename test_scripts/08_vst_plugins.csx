@@ -5,6 +5,14 @@
 // SYNTAX TO REVIEW: VST functions, plugin loading, parameter control
 // ============================================================================
 
+// ============================================================================
+// ALIAS DEMONSTRATION
+// ============================================================================
+// This script now shows BOTH original syntax AND new aliases
+// All examples work with either syntax - use what you prefer!
+// ============================================================================
+Print("");
+
 Print("=== VST PLUGIN CONTROL TEST ===");
 Print("");
 
@@ -215,6 +223,20 @@ if (synth != null)
 Print("");
 
 Print("=== VST PLUGIN CONTROL TEST COMPLETED ===");
+
+// ============================================================================
+// IMPLEMENTED ALIASES:
+// ============================================================================
+// CreateSynth → synth, s, newSynth
+// CreatePattern → pattern, p, newPattern
+// Start → play, run, go
+// Stop → pause, halt
+// SetBpm → bpm, tempo
+// Skip → jump, seek
+// Print → log, write
+//
+// All aliases work identically - choose your preferred style!
+// ============================================================================
 
 // ============================================================================
 // SYNTAX ELEMENTS TO CUSTOMIZE:

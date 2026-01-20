@@ -29,6 +29,13 @@ public class SampleControl
         return new SamplerBuilder(_globals, sampler);
     }
 
+    /// <summary>Alias for create - PascalCase version</summary>
+    public SamplerBuilder Create(string? name = null) => create(name);
+    /// <summary>Alias for create - Creates a new sampler</summary>
+    public SamplerBuilder @new(string? name = null) => create(name);
+    /// <summary>Alias for create - Makes a new sampler</summary>
+    public SamplerBuilder make(string? name = null) => create(name);
+
     /// <summary>
     /// Loads a single sample as an instrument.
     /// </summary>
@@ -38,6 +45,11 @@ public class SampleControl
         return new SamplerBuilder(_globals, sampler);
     }
 
+    /// <summary>Alias for load - PascalCase version</summary>
+    public SamplerBuilder Load(string filePath, int rootNote = 60) => load(filePath, rootNote);
+    /// <summary>Alias for load - Adds a sample as an instrument</summary>
+    public SamplerBuilder add(string filePath, int rootNote = 60) => load(filePath, rootNote);
+
     /// <summary>
     /// Creates a sampler from a directory of samples.
     /// </summary>
@@ -46,6 +58,13 @@ public class SampleControl
         var sampler = _globals.CreateSamplerFromDirectory(path);
         return new SamplerBuilder(_globals, sampler);
     }
+
+    /// <summary>Alias for fromDirectory - PascalCase version</summary>
+    public SamplerBuilder FromDirectory(string path) => fromDirectory(path);
+    /// <summary>Alias for fromDirectory - Short form</summary>
+    public SamplerBuilder fromDir(string path) => fromDirectory(path);
+    /// <summary>Alias for fromDirectory - Directory-based sampler</summary>
+    public SamplerBuilder dir(string path) => fromDirectory(path);
 }
 
 /// <summary>

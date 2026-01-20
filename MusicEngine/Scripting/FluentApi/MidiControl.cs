@@ -25,11 +25,33 @@ public class MidiControl
         return new DeviceControl(_globals, index); // Return device control
     }
 
+    /// <summary>Alias for device - PascalCase version</summary>
+    public DeviceControl Device(int index) => device(index);
+    /// <summary>Alias for device - PascalCase version</summary>
+    public DeviceControl Device(string name) => device(name);
+    /// <summary>Alias for device - Short form</summary>
+    public DeviceControl dev(int index) => device(index);
+    /// <summary>Alias for device - Short form</summary>
+    public DeviceControl dev(string name) => device(name);
+    /// <summary>Alias for device - Single character short form</summary>
+    public DeviceControl d(int index) => device(index);
+    /// <summary>Alias for device - Single character short form</summary>
+    public DeviceControl d(string name) => device(name);
+
     // Access MIDI input by index
     public DeviceControl input(int index) => device(index);
 
     // Access MIDI input by name
     public DeviceControl input(string name) => device(name);
+
+    /// <summary>Alias for input - PascalCase version</summary>
+    public DeviceControl Input(int index) => input(index);
+    /// <summary>Alias for input - PascalCase version</summary>
+    public DeviceControl Input(string name) => input(name);
+    /// <summary>Alias for input - Short form</summary>
+    public DeviceControl @in(int index) => input(index);
+    /// <summary>Alias for input - Short form</summary>
+    public DeviceControl @in(string name) => input(name);
 
     // Access MIDI output by index
     public MidiOutputControl output(int index) => new MidiOutputControl(_globals, index);
@@ -40,6 +62,15 @@ public class MidiControl
         int index = _globals.Engine.GetMidiOutputDeviceIndex(name);
         return new MidiOutputControl(_globals, index);
     }
+
+    /// <summary>Alias for output - PascalCase version</summary>
+    public MidiOutputControl Output(int index) => output(index);
+    /// <summary>Alias for output - PascalCase version</summary>
+    public MidiOutputControl Output(string name) => output(name);
+    /// <summary>Alias for output - Short form</summary>
+    public MidiOutputControl @out(int index) => output(index);
+    /// <summary>Alias for output - Short form</summary>
+    public MidiOutputControl @out(string name) => output(name);
 
     // Access playable keys mapping
     public PlayableKeys playablekeys => new PlayableKeys(_globals);

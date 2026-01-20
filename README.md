@@ -11,6 +11,35 @@
 
 **Music Engine** is a modular, open-source live-coding music engine written in C#. It combines code, MIDI, patterns, and real-time audio to enable flexible music production, live performance, and interactive audio programming.
 
+## Multiple Function Aliases
+
+MusicEngine supports multiple aliases for all functions, allowing you to choose the syntax you prefer:
+
+### Examples
+```csharp
+// All of these work identically:
+CreateSynth()  // Full name
+synth()        // Short name
+s()            // Very short
+newSynth()     // Alternative
+
+// Transport control:
+Start()  or  play()  or  run()  or  go()
+Stop()   or  pause() or  halt()
+SetBpm(120)  or  bpm(120)  or  tempo(120)
+
+// Navigation:
+Skip(4)  or  jump(4)  or  seek(4)
+
+// MIDI routing:
+midi.device(0)  or  midi.input(0)
+
+// VST plugins:
+vst.load("MySynth")  or  vst.get("MySynth")  or  vst.plugin("MySynth")
+```
+
+Use whatever feels natural to you - all aliases are fully supported!
+
 ## Overview
 
 MusicEngine provides a complete audio production framework with:

@@ -79,6 +79,13 @@ public class ScriptGlobals
         return synth; // Return the created synth
     }
 
+    /// <summary>Alias for CreateSynth - Creates a synthesizer</summary>
+    public SimpleSynth synth() => CreateSynth();
+    /// <summary>Alias for CreateSynth - Creates a synthesizer (short form)</summary>
+    public SimpleSynth s() => CreateSynth();
+    /// <summary>Alias for CreateSynth - Creates a new synthesizer</summary>
+    public SimpleSynth newSynth() => CreateSynth();
+
     // Creates a Pattern with the default Synth
     public Pattern CreatePattern() => CreatePattern(Synth);
 
@@ -91,6 +98,19 @@ public class ScriptGlobals
         pattern.InstrumentName = synth is SimpleSynth ss ? (ss.Name ?? synth.GetType().Name) : synth.GetType().Name;
         return pattern; // Return the created pattern
     }
+
+    /// <summary>Alias for CreatePattern - Creates a pattern</summary>
+    public Pattern pattern() => CreatePattern();
+    /// <summary>Alias for CreatePattern - Creates a pattern</summary>
+    public Pattern pattern(ISynth synth) => CreatePattern(synth);
+    /// <summary>Alias for CreatePattern - Creates a pattern (short form)</summary>
+    public Pattern p() => CreatePattern();
+    /// <summary>Alias for CreatePattern - Creates a pattern (short form)</summary>
+    public Pattern p(ISynth synth) => CreatePattern(synth);
+    /// <summary>Alias for CreatePattern - Creates a new pattern</summary>
+    public Pattern newPattern() => CreatePattern();
+    /// <summary>Alias for CreatePattern - Creates a new pattern</summary>
+    public Pattern newPattern(ISynth synth) => CreatePattern(synth);
 
     // Routes MIDI input from a device to a synthesizer
     public void RouteMidi(int deviceIndex, ISynth synth)
@@ -156,11 +176,33 @@ public class ScriptGlobals
     public void SetScratching(bool scratching) => Sequencer.IsScratching = scratching; // Enable or disable scratching mode
 
     public void Start() => Sequencer.Start(); // Start the sequencer
+    /// <summary>Alias for Start - Starts playback</summary>
+    public void play() => Start();
+    /// <summary>Alias for Start - Runs the sequencer</summary>
+    public void run() => Start();
+    /// <summary>Alias for Start - Starts the sequencer</summary>
+    public void go() => Start();
+
     public void Stop() => Sequencer.Stop(); // Stop the sequencer
+    /// <summary>Alias for Stop - Pauses playback</summary>
+    public void pause() => Stop();
+    /// <summary>Alias for Stop - Halts the sequencer</summary>
+    public void halt() => Stop();
+
     public void SetBpm(double bpm) => Sequencer.Bpm = bpm; // Set the BPM of the sequencer
+    /// <summary>Alias for SetBpm - Sets the tempo</summary>
+    public void bpm(double bpm) => SetBpm(bpm);
+    /// <summary>Alias for SetBpm - Sets the tempo</summary>
+    public void tempo(double bpm) => SetBpm(bpm);
+
     public void SetBPM(double bpm) => Sequencer.Bpm = bpm; // Alias for SetBpm
     public double BPM { get => Sequencer.Bpm; set => Sequencer.Bpm = value; } // BPM property
+
     public void Skip(double beats) => Sequencer.Skip(beats); // Skip a number of beats in the sequencer
+    /// <summary>Alias for Skip - Jumps forward by beats</summary>
+    public void jump(double beats) => Skip(beats);
+    /// <summary>Alias for Skip - Seeks to a position</summary>
+    public void seek(double beats) => Skip(beats);
 
     public void StartPattern(Pattern p) => p.Enabled = true; // Start a pattern
     public void StopPattern(Pattern p) => p.Enabled = false; // Stop a pattern
@@ -185,6 +227,10 @@ public class ScriptGlobals
 
     // Prints a message to the console
     public void Print(string message) => Console.WriteLine(message);
+    /// <summary>Alias for Print - Logs a message to console</summary>
+    public void log(string message) => Print(message);
+    /// <summary>Alias for Print - Writes a message to console</summary>
+    public void write(string message) => Print(message);
 
     public AudioControl audio => new AudioControl(this);
     public MidiControl midi => new MidiControl(this);
@@ -244,6 +290,11 @@ public class ScriptGlobals
         return sampler;
     }
 
+    /// <summary>Alias for CreateSampler - Creates a sample instrument</summary>
+    public SampleInstrument sampler(string? name = null) => CreateSampler(name);
+    /// <summary>Alias for CreateSampler - Creates a sample instrument</summary>
+    public SampleInstrument sample(string? name = null) => CreateSampler(name);
+
     /// <summary>
     /// Creates a sample instrument and loads a single sample.
     /// The sample is mapped to all notes with pitch shifting from the root note.
@@ -290,6 +341,11 @@ public class ScriptGlobals
     {
         return Engine.CreateVirtualChannel(name);
     }
+
+    /// <summary>Alias for CreateVirtualChannel - Creates a virtual audio channel (short form)</summary>
+    public VirtualAudioChannel vchan(string name) => CreateVirtualChannel(name);
+    /// <summary>Alias for CreateVirtualChannel - Creates a virtual audio channel</summary>
+    public VirtualAudioChannel channel(string name) => CreateVirtualChannel(name);
 
     /// <summary>
     /// Lists all virtual audio channels.
