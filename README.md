@@ -23,6 +23,11 @@ synth()        // Short name
 s()            // Very short
 newSynth()     // Alternative
 
+// General MIDI instruments:
+CreateGeneralMidiInstrument(GeneralMidiProgram.AcousticGrandPiano)
+gm(GeneralMidiProgram.AcousticGrandPiano)     // Short form
+newGm(GeneralMidiProgram.AcousticGrandPiano)  // Alternative
+
 // Transport control:
 Start()  or  play()  or  run()  or  go()
 Stop()   or  pause() or  halt()
@@ -45,10 +50,12 @@ Use whatever feels natural to you - all aliases are fully supported!
 MusicEngine provides a complete audio production framework with:
 
 - Real-time audio synthesis and sample playback
+- **128 General MIDI instruments** via Windows built-in synthesizer
 - Pattern-based sequencing with loop support
 - MIDI input/output routing and control mapping
 - VST plugin hosting (VST2 and VST3)
-- Built-in audio effects (Reverb, Delay, Chorus)
+- **14 professional audio effects** (Reverb, Delay, Chorus, Compressor, EQ, Distortion, and more)
+- **Audio routing system** with buses, channels, and sends
 - C# scripting via Roslyn for live coding
 - High-precision timing with MIDI clock synchronization
 - Audio recording and export capabilities
@@ -162,7 +169,7 @@ dotnet run --project MusicEngine
 ### Basic Usage Example
 
 ```csharp
-// Create a synthesizer
+// Using built-in synthesizer
 var synth = CreateSynth();
 synth.Waveform = WaveType.Sawtooth;
 
@@ -178,6 +185,26 @@ pattern.Note(72, 3.0, 0.5, 100);   // C5 at beat 3
 // Start playback
 SetBpm(120);
 pattern.Play();
+```
+
+### General MIDI Example
+
+```csharp
+// Use Windows built-in piano sound
+var piano = gm(GeneralMidiProgram.AcousticGrandPiano);
+
+// Create a pattern
+var pattern = CreatePattern(piano);
+pattern.AddNote(0.0, 60, 100, 0.5);  // C4
+pattern.AddNote(0.5, 64, 100, 0.5);  // E4
+pattern.AddNote(1.0, 67, 100, 0.5);  // G4
+pattern.AddNote(1.5, 72, 100, 1.0);  // C5
+pattern.Loop = true;
+
+// Start playback
+SetBpm(120);
+pattern.Play();
+Start();
 ```
 
 ---

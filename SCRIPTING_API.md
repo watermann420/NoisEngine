@@ -8,16 +8,17 @@ This documentation describes the complete scripting API of the MusicEngine. The 
 
 1. [Basic Variables](#1-basic-variables)
 2. [Synth Creation](#2-synth-creation)
-3. [Sample Instrument API](#3-sample-instrument-api)
-4. [Transport Controls](#4-transport-controls)
-5. [Pattern Control](#5-pattern-control)
-6. [MIDI Fluent API](#6-midi-fluent-api)
-7. [Audio Controls](#7-audio-controls)
-8. [VST Plugin API](#8-vst-plugin-api)
-9. [Sample Fluent API](#9-sample-fluent-api)
-10. [Helper Functions](#10-helper-functions)
-11. [Frequency Triggers](#11-frequency-triggers)
-12. [Virtual Audio Channels](#12-virtual-audio-channels)
+3. [General MIDI Instruments](#3-general-midi-instruments)
+4. [Sample Instrument API](#4-sample-instrument-api)
+5. [Transport Controls](#5-transport-controls)
+6. [Pattern Control](#6-pattern-control)
+7. [MIDI Fluent API](#7-midi-fluent-api)
+8. [Audio Controls](#8-audio-controls)
+9. [VST Plugin API](#9-vst-plugin-api)
+10. [Sample Fluent API](#10-sample-fluent-api)
+11. [Helper Functions](#11-helper-functions)
+12. [Frequency Triggers](#12-frequency-triggers)
+13. [Virtual Audio Channels](#13-virtual-audio-channels)
 
 ---
 
@@ -93,7 +94,395 @@ Start();
 
 ---
 
-## 3. Sample Instrument API
+## 3. General MIDI Instruments
+
+MusicEngine provides access to Windows built-in General MIDI synthesizer (Microsoft GS Wavetable Synth), which includes all 128 standard GM instruments. These instruments are ideal for quick prototyping, MIDI playback, or when you need realistic instrument sounds without loading samples or VST plugins.
+
+### CreateGeneralMidiInstrument
+
+**Aliases:** `CreateGeneralMidiInstrument(program, channel)`, `gm(program, channel)`, `newGm(program, channel)`
+
+Creates a new General MIDI instrument using Windows built-in synthesizer.
+
+```csharp
+GeneralMidiInstrument CreateGeneralMidiInstrument(GeneralMidiProgram program, int channel = 0)
+```
+
+**Parameters:**
+- `program` - The General MIDI instrument to use (see instrument list below)
+- `channel` - MIDI channel (0-15, default 0). Channel 9 is typically reserved for drums.
+
+**Returns:** A new `GeneralMidiInstrument` instance
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Program` | `GeneralMidiProgram` | The current GM instrument |
+| `Channel` | `int` | The MIDI channel (0-15) |
+| `Name` | `string` | Instrument name (e.g., "GM_AcousticGrandPiano") |
+| `Volume` | `float` | Volume control (0.0 - 1.0) |
+
+### Methods
+
+| Method | Description |
+|--------|-------------|
+| `NoteOn(noteNumber, velocity)` | Start playing a note (noteNumber: 0-127, velocity: 0-127) |
+| `NoteOff(noteNumber)` | Stop playing a note |
+| `AllNotesOff()` | Stop all currently playing notes |
+| `PitchBend(bend)` | Send pitch bend (-1.0 to 1.0, where 0 is center) |
+| `SendControlChange(controller, value)` | Send MIDI control change (controller: 0-127, value: 0-127) |
+| `SetParameter(name, value)` | Set parameter by name (see parameters below) |
+| `GetParameter(name)` | Get parameter value by name |
+
+### Supported Parameters
+
+Parameters can be set using `SetParameter(name, value)`:
+
+| Parameter | Range | Description |
+|-----------|-------|-------------|
+| `"volume"` | 0.0 - 1.0 | Master volume |
+| `"pan"` | -1.0 - 1.0 | Pan (-1 = left, 0 = center, 1 = right) |
+| `"expression"` | 0.0 - 1.0 | Expression control (dynamics) |
+| `"reverb"` | 0.0 - 1.0 | Reverb level |
+| `"chorus"` | 0.0 - 1.0 | Chorus level |
+| `"modulation"` | 0.0 - 1.0 | Modulation wheel |
+| `"sustain"` | 0.0 - 1.0 | Sustain pedal (>0.5 = on) |
+
+### General MIDI Instruments
+
+#### Piano (0-7)
+```csharp
+GeneralMidiProgram.AcousticGrandPiano       // 0
+GeneralMidiProgram.BrightAcousticPiano      // 1
+GeneralMidiProgram.ElectricGrandPiano       // 2
+GeneralMidiProgram.HonkyTonkPiano           // 3
+GeneralMidiProgram.ElectricPiano1           // 4
+GeneralMidiProgram.ElectricPiano2           // 5
+GeneralMidiProgram.Harpsichord              // 6
+GeneralMidiProgram.Clavinet                 // 7
+```
+
+#### Chromatic Percussion (8-15)
+```csharp
+GeneralMidiProgram.Celesta                  // 8
+GeneralMidiProgram.Glockenspiel             // 9
+GeneralMidiProgram.MusicBox                 // 10
+GeneralMidiProgram.Vibraphone               // 11
+GeneralMidiProgram.Marimba                  // 12
+GeneralMidiProgram.Xylophone                // 13
+GeneralMidiProgram.TubularBells             // 14
+GeneralMidiProgram.Dulcimer                 // 15
+```
+
+#### Organ (16-23)
+```csharp
+GeneralMidiProgram.DrawbarOrgan             // 16
+GeneralMidiProgram.PercussiveOrgan          // 17
+GeneralMidiProgram.RockOrgan                // 18
+GeneralMidiProgram.ChurchOrgan              // 19
+GeneralMidiProgram.ReedOrgan                // 20
+GeneralMidiProgram.Accordion                // 21
+GeneralMidiProgram.Harmonica                // 22
+GeneralMidiProgram.TangoAccordion           // 23
+```
+
+#### Guitar (24-31)
+```csharp
+GeneralMidiProgram.AcousticGuitarNylon      // 24
+GeneralMidiProgram.AcousticGuitarSteel      // 25
+GeneralMidiProgram.ElectricGuitarJazz       // 26
+GeneralMidiProgram.ElectricGuitarClean      // 27
+GeneralMidiProgram.ElectricGuitarMuted      // 28
+GeneralMidiProgram.OverdrivenGuitar         // 29
+GeneralMidiProgram.DistortionGuitar         // 30
+GeneralMidiProgram.GuitarHarmonics          // 31
+```
+
+#### Bass (32-39)
+```csharp
+GeneralMidiProgram.AcousticBass             // 32
+GeneralMidiProgram.ElectricBassFinger       // 33
+GeneralMidiProgram.ElectricBassPick         // 34
+GeneralMidiProgram.FretlessBass             // 35
+GeneralMidiProgram.SlapBass1                // 36
+GeneralMidiProgram.SlapBass2                // 37
+GeneralMidiProgram.SynthBass1               // 38
+GeneralMidiProgram.SynthBass2               // 39
+```
+
+#### Strings (40-47)
+```csharp
+GeneralMidiProgram.Violin                   // 40
+GeneralMidiProgram.Viola                    // 41
+GeneralMidiProgram.Cello                    // 42
+GeneralMidiProgram.Contrabass               // 43
+GeneralMidiProgram.TremoloStrings           // 44
+GeneralMidiProgram.PizzicatoStrings         // 45
+GeneralMidiProgram.OrchestralHarp           // 46
+GeneralMidiProgram.Timpani                  // 47
+```
+
+#### Ensemble (48-55)
+```csharp
+GeneralMidiProgram.StringEnsemble1          // 48
+GeneralMidiProgram.StringEnsemble2          // 49
+GeneralMidiProgram.SynthStrings1            // 50
+GeneralMidiProgram.SynthStrings2            // 51
+GeneralMidiProgram.ChoirAahs                // 52
+GeneralMidiProgram.VoiceOohs                // 53
+GeneralMidiProgram.SynthVoice               // 54
+GeneralMidiProgram.OrchestraHit             // 55
+```
+
+#### Brass (56-63)
+```csharp
+GeneralMidiProgram.Trumpet                  // 56
+GeneralMidiProgram.Trombone                 // 57
+GeneralMidiProgram.Tuba                     // 58
+GeneralMidiProgram.MutedTrumpet             // 59
+GeneralMidiProgram.FrenchHorn               // 60
+GeneralMidiProgram.BrassSection             // 61
+GeneralMidiProgram.SynthBrass1              // 62
+GeneralMidiProgram.SynthBrass2              // 63
+```
+
+#### Reed (64-71)
+```csharp
+GeneralMidiProgram.SopranoSax               // 64
+GeneralMidiProgram.AltoSax                  // 65
+GeneralMidiProgram.TenorSax                 // 66
+GeneralMidiProgram.BaritoneSax              // 67
+GeneralMidiProgram.Oboe                     // 68
+GeneralMidiProgram.EnglishHorn              // 69
+GeneralMidiProgram.Bassoon                  // 70
+GeneralMidiProgram.Clarinet                 // 71
+```
+
+#### Pipe (72-79)
+```csharp
+GeneralMidiProgram.Piccolo                  // 72
+GeneralMidiProgram.Flute                    // 73
+GeneralMidiProgram.Recorder                 // 74
+GeneralMidiProgram.PanFlute                 // 75
+GeneralMidiProgram.BlownBottle              // 76
+GeneralMidiProgram.Shakuhachi               // 77
+GeneralMidiProgram.Whistle                  // 78
+GeneralMidiProgram.Ocarina                  // 79
+```
+
+#### Synth Lead (80-87)
+```csharp
+GeneralMidiProgram.Lead1Square              // 80
+GeneralMidiProgram.Lead2Sawtooth            // 81
+GeneralMidiProgram.Lead3Calliope            // 82
+GeneralMidiProgram.Lead4Chiff               // 83
+GeneralMidiProgram.Lead5Charang             // 84
+GeneralMidiProgram.Lead6Voice               // 85
+GeneralMidiProgram.Lead7Fifths              // 86
+GeneralMidiProgram.Lead8BassLead            // 87
+```
+
+#### Synth Pad (88-95)
+```csharp
+GeneralMidiProgram.Pad1NewAge               // 88
+GeneralMidiProgram.Pad2Warm                 // 89
+GeneralMidiProgram.Pad3Polysynth            // 90
+GeneralMidiProgram.Pad4Choir                // 91
+GeneralMidiProgram.Pad5Bowed                // 92
+GeneralMidiProgram.Pad6Metallic             // 93
+GeneralMidiProgram.Pad7Halo                 // 94
+GeneralMidiProgram.Pad8Sweep                // 95
+```
+
+#### Synth Effects (96-103)
+```csharp
+GeneralMidiProgram.FX1Rain                  // 96
+GeneralMidiProgram.FX2Soundtrack            // 97
+GeneralMidiProgram.FX3Crystal               // 98
+GeneralMidiProgram.FX4Atmosphere            // 99
+GeneralMidiProgram.FX5Brightness            // 100
+GeneralMidiProgram.FX6Goblins               // 101
+GeneralMidiProgram.FX7Echoes                // 102
+GeneralMidiProgram.FX8SciFi                 // 103
+```
+
+#### Ethnic (104-111)
+```csharp
+GeneralMidiProgram.Sitar                    // 104
+GeneralMidiProgram.Banjo                    // 105
+GeneralMidiProgram.Shamisen                 // 106
+GeneralMidiProgram.Koto                     // 107
+GeneralMidiProgram.Kalimba                  // 108
+GeneralMidiProgram.BagPipe                  // 109
+GeneralMidiProgram.Fiddle                   // 110
+GeneralMidiProgram.Shanai                   // 111
+```
+
+#### Percussive (112-119)
+```csharp
+GeneralMidiProgram.TinkleBell               // 112
+GeneralMidiProgram.Agogo                    // 113
+GeneralMidiProgram.SteelDrums               // 114
+GeneralMidiProgram.Woodblock                // 115
+GeneralMidiProgram.TaikoDrum                // 116
+GeneralMidiProgram.MelodicTom               // 117
+GeneralMidiProgram.SynthDrum                // 118
+GeneralMidiProgram.ReverseCymbal            // 119
+```
+
+#### Sound Effects (120-127)
+```csharp
+GeneralMidiProgram.GuitarFretNoise          // 120
+GeneralMidiProgram.BreathNoise              // 121
+GeneralMidiProgram.Seashore                 // 122
+GeneralMidiProgram.BirdTweet                // 123
+GeneralMidiProgram.TelephoneRing            // 124
+GeneralMidiProgram.Helicopter               // 125
+GeneralMidiProgram.Applause                 // 126
+GeneralMidiProgram.Gunshot                  // 127
+```
+
+### Basic Example
+
+```csharp
+// Create a piano instrument
+var piano = gm(GeneralMidiProgram.AcousticGrandPiano);
+
+// Create a pattern
+var pattern = CreatePattern(piano);
+pattern.AddNote(0.0, 60, 100, 0.5);  // C4
+pattern.AddNote(0.5, 64, 100, 0.5);  // E4
+pattern.AddNote(1.0, 67, 100, 0.5);  // G4
+pattern.AddNote(1.5, 72, 100, 1.0);  // C5
+pattern.Loop = true;
+
+// Start playback
+SetBpm(120);
+pattern.Play();
+Start();
+```
+
+### Volume and Pan Control
+
+```csharp
+var strings = gm(GeneralMidiProgram.StringEnsemble1);
+
+// Set volume to 75%
+strings.Volume = 0.75f;
+
+// Pan to left
+strings.SetParameter("pan", -0.5f);
+
+// Add reverb
+strings.SetParameter("reverb", 0.6f);
+```
+
+### Pitch Bend Example
+
+```csharp
+var lead = gm(GeneralMidiProgram.Lead2Sawtooth);
+
+// Start a note
+lead.NoteOn(60, 100);
+
+// Bend pitch up (0.5 = +1 semitone)
+lead.PitchBend(0.5f);
+
+await Task.Delay(500);
+
+// Reset pitch
+lead.PitchBend(0.0f);
+
+// Stop the note
+lead.NoteOff(60);
+```
+
+### Multi-Channel Layering
+
+```csharp
+// Layer multiple instruments on different MIDI channels
+var piano1 = gm(GeneralMidiProgram.AcousticGrandPiano, 0);
+var piano2 = gm(GeneralMidiProgram.ElectricPiano1, 1);
+var bass = gm(GeneralMidiProgram.FretlessBass, 2);
+
+// Now all three can play simultaneously without interfering
+```
+
+### Combining with Effects
+
+```csharp
+var epiano = gm(GeneralMidiProgram.ElectricPiano1);
+
+// Add reverb effect from MusicEngine
+var reverbedPiano = fx.Reverb(epiano, "piano-reverb")
+    .RoomSize(0.7)
+    .DryWet(0.3)
+    .Build();
+
+// Add chorus
+var chorusedGuitar = fx.Chorus(
+    gm(GeneralMidiProgram.ElectricGuitarClean),
+    "guitar-chorus")
+    .Rate(0.8)
+    .Voices(3)
+    .DryWet(0.5)
+    .Build();
+```
+
+### Full Band Example
+
+```csharp
+// Create a complete band using GM instruments
+var drums = gm(GeneralMidiProgram.SynthDrum, 9);  // Channel 9 for drums
+var bass = gm(GeneralMidiProgram.ElectricBassPick);
+var rhythm = gm(GeneralMidiProgram.ElectricGuitarClean);
+var lead = gm(GeneralMidiProgram.Lead2Sawtooth);
+var pad = gm(GeneralMidiProgram.Pad2Warm);
+
+// Set volumes
+bass.Volume = 0.8f;
+pad.Volume = 0.4f;
+
+// Add panning
+rhythm.SetParameter("pan", -0.3f);  // Slightly left
+lead.SetParameter("pan", 0.3f);     // Slightly right
+
+// Create patterns for each instrument
+var bassPattern = CreatePattern(bass);
+var rhythmPattern = CreatePattern(rhythm);
+// ... etc
+```
+
+### MIDI Control Changes
+
+```csharp
+var synth = gm(GeneralMidiProgram.SynthBrass1);
+
+// Modulation wheel (CC 1)
+synth.SendControlChange(1, 64);
+
+// Sustain pedal on (CC 64)
+synth.SendControlChange(64, 127);
+
+// Sustain pedal off
+synth.SendControlChange(64, 0);
+```
+
+### Notes
+
+- Windows built-in synthesizer (Microsoft GS Wavetable Synth) is used
+- All 128 General MIDI instruments are available
+- GM instruments return silence from `Read()` - actual audio is through MIDI device
+- Can be used with patterns just like SimpleSynth
+- Can be combined with MusicEngine effects
+- Channel 9 (10th channel, value 9) is reserved for drums in GM standard
+- Supports 16 MIDI channels (0-15) for layering instruments
+- Perfect for prototyping before loading samples or VST plugins
+
+---
+
+## 4. Sample Instrument API
 
 The Sample Instrument API enables the creation of sample-based synthesizers.
 

@@ -86,6 +86,19 @@ public class ScriptGlobals
     /// <summary>Alias for CreateSynth - Creates a new synthesizer</summary>
     public SimpleSynth newSynth() => CreateSynth();
 
+    // Creates and adds a GeneralMidiInstrument to the engine
+    public GeneralMidiInstrument CreateGeneralMidiInstrument(GeneralMidiProgram program, int channel = 0)
+    {
+        var instrument = new GeneralMidiInstrument(program, channel);
+        Engine.AddSampleProvider(instrument);
+        return instrument;
+    }
+
+    /// <summary>Alias for CreateGeneralMidiInstrument - Creates a GM instrument (short form)</summary>
+    public GeneralMidiInstrument gm(GeneralMidiProgram program, int channel = 0) => CreateGeneralMidiInstrument(program, channel);
+    /// <summary>Alias for CreateGeneralMidiInstrument - Creates a new GM instrument</summary>
+    public GeneralMidiInstrument newGm(GeneralMidiProgram program, int channel = 0) => CreateGeneralMidiInstrument(program, channel);
+
     // Creates a Pattern with the default Synth
     public Pattern CreatePattern() => CreatePattern(Synth);
 
