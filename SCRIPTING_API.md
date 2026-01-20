@@ -1,13 +1,13 @@
-# MusicEngine Scripting API Dokumentation
+# MusicEngine Scripting API Documentation
 
-Diese Dokumentation beschreibt die vollstaendige Scripting API der MusicEngine. Die Scripting-Umgebung basiert auf C# und ermoeglicht die Steuerung von Audio-Engine, Sequenzer, MIDI-Geraeten, VST-Plugins und Sample-Instrumenten.
+This documentation describes the complete scripting API of the MusicEngine. The scripting environment is based on C# and enables control of the audio engine, sequencer, MIDI devices, VST plugins, and sample instruments.
 
 ---
 
-## Inhaltsverzeichnis
+## Table of Contents
 
-1. [Basis-Variablen](#1-basis-variablen)
-2. [Synth Erstellung](#2-synth-erstellung)
+1. [Basic Variables](#1-basic-variables)
+2. [Synth Creation](#2-synth-creation)
 3. [Sample Instrument API](#3-sample-instrument-api)
 4. [Transport Controls](#4-transport-controls)
 5. [Pattern Control](#5-pattern-control)
@@ -15,74 +15,74 @@ Diese Dokumentation beschreibt die vollstaendige Scripting API der MusicEngine. 
 7. [Audio Controls](#7-audio-controls)
 8. [VST Plugin API](#8-vst-plugin-api)
 9. [Sample Fluent API](#9-sample-fluent-api)
-10. [Hilfsfunktionen](#10-hilfsfunktionen)
-11. [Frequenz-Trigger](#11-frequenz-trigger)
+10. [Helper Functions](#10-helper-functions)
+11. [Frequency Triggers](#11-frequency-triggers)
 12. [Virtual Audio Channels](#12-virtual-audio-channels)
 
 ---
 
-## 1. Basis-Variablen
+## 1. Basic Variables
 
-Die Scripting-Umgebung stellt zwei zentrale Objekte bereit, die in jedem Skript verfuegbar sind:
+The scripting environment provides two central objects that are available in every script:
 
-| Variable | Typ | Beschreibung |
-|----------|-----|--------------|
-| `Engine` / `engine` | `AudioEngine` | Die Audio-Engine Instanz fuer Soundausgabe und MIDI-Routing |
-| `Sequencer` / `sequencer` | `Sequencer` | Der Sequenzer fuer Pattern-Wiedergabe und Timing |
+| Variable | Type | Description |
+|----------|------|-------------|
+| `Engine` / `engine` | `AudioEngine` | The audio engine instance for sound output and MIDI routing |
+| `Sequencer` / `sequencer` | `Sequencer` | The sequencer for pattern playback and timing |
 
-### Beispiel
+### Example
 
 ```csharp
-// Beide Schreibweisen sind aequivalent
+// Both notations are equivalent
 engine.AddSampleProvider(synth);
 Engine.AddSampleProvider(synth);
 
-// Sequenzer starten
+// Start sequencer
 sequencer.Start();
 Sequencer.Start();
 ```
 
 ---
 
-## 2. Synth Erstellung
+## 2. Synth Creation
 
 ### CreateSynth()
 
-Erstellt einen neuen `SimpleSynth` und fuegt ihn automatisch zur Audio-Engine hinzu.
+Creates a new `SimpleSynth` and automatically adds it to the audio engine.
 
 ```csharp
 SimpleSynth CreateSynth()
 ```
 
-**Rueckgabe:** Eine neue `SimpleSynth`-Instanz
+**Returns:** A new `SimpleSynth` instance
 
 ### CreatePattern(synth)
 
-Erstellt ein neues `Pattern` fuer einen Synthesizer und fuegt es zum Sequenzer hinzu.
+Creates a new `Pattern` for a synthesizer and adds it to the sequencer.
 
 ```csharp
 Pattern CreatePattern(ISynth synth)
 ```
 
-**Parameter:**
-- `synth` - Der Synthesizer, der vom Pattern gesteuert wird
+**Parameters:**
+- `synth` - The synthesizer that is controlled by the pattern
 
-**Rueckgabe:** Eine neue `Pattern`-Instanz
+**Returns:** A new `Pattern` instance
 
-### Beispiel
+### Example
 
 ```csharp
-// Synth erstellen und Pattern hinzufuegen
+// Create synth and add pattern
 var synth = CreateSynth();
 var pattern = CreatePattern(synth);
 
-// Pattern mit Noten fuellen
+// Fill pattern with notes
 pattern.AddNote(0, 60, 100, 0.5);    // Beat 0: C4
 pattern.AddNote(1, 64, 100, 0.5);    // Beat 1: E4
 pattern.AddNote(2, 67, 100, 0.5);    // Beat 2: G4
 pattern.AddNote(3, 72, 100, 0.5);    // Beat 3: C5
 
-// Sequenzer starten
+// Start sequencer
 SetBpm(120);
 Start();
 ```
@@ -91,77 +91,77 @@ Start();
 
 ## 3. Sample Instrument API
 
-Die Sample Instrument API ermoeglicht das Erstellen von Sample-basierten Synthesizern.
+The Sample Instrument API enables the creation of sample-based synthesizers.
 
 ### CreateSampler(name?)
 
-Erstellt einen neuen `SampleInstrument` und fuegt ihn zur Audio-Engine hinzu.
+Creates a new `SampleInstrument` and adds it to the audio engine.
 
 ```csharp
 SampleInstrument CreateSampler(string? name = null)
 ```
 
-**Parameter:**
-- `name` (optional) - Name fuer den Sampler
+**Parameters:**
+- `name` (optional) - Name for the sampler
 
-**Rueckgabe:** Eine neue `SampleInstrument`-Instanz
+**Returns:** A new `SampleInstrument` instance
 
 ### CreateSamplerFromFile(filePath, rootNote?)
 
-Erstellt einen Sampler und laedt eine einzelne Audio-Datei. Das Sample wird auf alle Noten mit Pitch-Shifting vom Root-Note gemappt.
+Creates a sampler and loads a single audio file. The sample is mapped to all notes with pitch-shifting from the root note.
 
 ```csharp
 SampleInstrument CreateSamplerFromFile(string filePath, int rootNote = 60)
 ```
 
-**Parameter:**
-- `filePath` - Pfad zur Audio-Datei (WAV, MP3, etc.)
-- `rootNote` (optional) - MIDI-Note, bei der das Sample unveraendert abgespielt wird (Standard: 60 = C4)
+**Parameters:**
+- `filePath` - Path to the audio file (WAV, MP3, etc.)
+- `rootNote` (optional) - MIDI note at which the sample is played unchanged (default: 60 = C4)
 
-**Rueckgabe:** Eine neue `SampleInstrument`-Instanz
+**Returns:** A new `SampleInstrument` instance
 
 ### CreateSamplerFromDirectory(directoryPath)
 
-Erstellt einen Sampler und laedt alle Samples aus einem Verzeichnis.
+Creates a sampler and loads all samples from a directory.
 
 ```csharp
 SampleInstrument CreateSamplerFromDirectory(string directoryPath)
 ```
 
-**Parameter:**
-- `directoryPath` - Pfad zum Sample-Verzeichnis
+**Parameters:**
+- `directoryPath` - Path to the sample directory
 
-**Rueckgabe:** Eine neue `SampleInstrument`-Instanz
+**Returns:** A new `SampleInstrument` instance
 
 ### LoadSampleToNote(sampler, filePath, note)
 
-Laedt ein Sample in einen bestehenden Sampler und mappt es auf eine bestimmte Note. Ideal fuer Drum-Pads.
+Loads a sample into an existing sampler and maps it to a specific note. Ideal for drum pads.
 
 ```csharp
 Sample? LoadSampleToNote(SampleInstrument sampler, string filePath, int note)
 ```
 
-**Parameter:**
-- `sampler` - Der Ziel-Sampler
-- `filePath` - Pfad zur Audio-Datei
-- `note` - MIDI-Note, auf die das Sample gemappt wird
+**Parameters:**
+- `sampler` - The target sampler
+- `filePath` - Path to the audio file
+- `note` - MIDI note to which the sample is mapped
 
-**Rueckgabe:** Das geladene `Sample` oder `null` bei Fehler
+**Returns:** The loaded `Sample` or `null` on error
 
-### Beispiel
+### Example
 
 ```csharp
-// Einfaches Piano-Sample laden
+// Load simple piano sample
 var piano = CreateSamplerFromFile("C:/Samples/piano_c4.wav", 60);
 var pianoPattern = CreatePattern(piano);
 
-// Drum-Kit aus einzelnen Samples erstellen
+// Create drum kit from individual samples
 var drums = CreateSampler("DrumKit");
 LoadSampleToNote(drums, "C:/Samples/kick.wav", 36);
 LoadSampleToNote(drums, "C:/Samples/snare.wav", 38);
 LoadSampleToNote(drums, "C:/Samples/hihat.wav", 42);
 
-// Sampler aus Verzeichnis laden
+// Load sampler from directory
 var strings = CreateSamplerFromDirectory("C:/Samples/Strings/");
 
 SetBpm(120);
@@ -172,11 +172,11 @@ Start();
 
 ## 4. Transport Controls
 
-Funktionen zur Steuerung der Wiedergabe.
+Functions for controlling playback.
 
 ### Start()
 
-Startet den Sequenzer.
+Starts the sequencer.
 
 ```csharp
 void Start()
@@ -184,7 +184,7 @@ void Start()
 
 ### Stop()
 
-Stoppt den Sequenzer.
+Stops the sequencer.
 
 ```csharp
 void Stop()
@@ -192,44 +192,44 @@ void Stop()
 
 ### SetBpm(bpm)
 
-Setzt das Tempo in Beats per Minute.
+Sets the tempo in beats per minute.
 
 ```csharp
 void SetBpm(double bpm)
 ```
 
-**Parameter:**
-- `bpm` - Tempo in BPM (z.B. 120.0)
+**Parameters:**
+- `bpm` - Tempo in BPM (e.g. 120.0)
 
 ### Skip(beats)
 
-Springt um eine bestimmte Anzahl von Beats vor oder zurueck.
+Skips forward or backward by a specific number of beats.
 
 ```csharp
 void Skip(double beats)
 ```
 
-**Parameter:**
-- `beats` - Anzahl der Beats (positiv = vorwaerts, negativ = rueckwaerts)
+**Parameters:**
+- `beats` - Number of beats (positive = forward, negative = backward)
 
 ### SetScratching(scratching)
 
-Aktiviert oder deaktiviert den Scratching-Modus.
+Enables or disables scratching mode.
 
 ```csharp
 void SetScratching(bool scratching)
 ```
 
-### Beispiel
+### Example
 
 ```csharp
 SetBpm(140);
 Start();
 
-// Nach 8 Beats springen
+// Skip forward 8 beats
 Skip(8);
 
-// Zurueck zum Anfang
+// Back to the beginning
 Skip(-8);
 
 Stop();
@@ -239,11 +239,11 @@ Stop();
 
 ## 5. Pattern Control
 
-Funktionen zur Steuerung einzelner Patterns.
+Functions for controlling individual patterns.
 
 ### StartPattern(pattern)
 
-Startet ein bestimmtes Pattern.
+Starts a specific pattern.
 
 ```csharp
 void StartPattern(Pattern p)
@@ -251,23 +251,23 @@ void StartPattern(Pattern p)
 
 ### StopPattern(pattern)
 
-Stoppt ein bestimmtes Pattern.
+Stops a specific pattern.
 
 ```csharp
 void StopPattern(Pattern p)
 ```
 
-### patterns Objekt
+### patterns Object
 
-Zugriff auf erweiterte Pattern-Kontrolle:
+Access to extended pattern control:
 
 ```csharp
-patterns.start(pattern)   // Pattern starten
-patterns.stop(pattern)    // Pattern stoppen
-patterns.toggle(pattern)  // Pattern ein/aus schalten
+patterns.start(pattern)   // Start pattern
+patterns.stop(pattern)    // Stop pattern
+patterns.toggle(pattern)  // Toggle pattern on/off
 ```
 
-### Beispiel
+### Example
 
 ```csharp
 var synth1 = CreateSynth();
@@ -276,14 +276,14 @@ var synth2 = CreateSynth();
 var melody = CreatePattern(synth1);
 var bass = CreatePattern(synth2);
 
-// Nur Melodie starten
+// Start only melody
 StartPattern(melody);
 Start();
 
-// Spaeter: Bass hinzufuegen
+// Later: add bass
 patterns.start(bass);
 
-// Pattern umschalten
+// Toggle pattern
 patterns.toggle(melody);
 ```
 
@@ -291,60 +291,60 @@ patterns.toggle(melody);
 
 ## 6. MIDI Fluent API
 
-Die MIDI API bietet eine fluessige Syntax fuer MIDI-Konfiguration.
+The MIDI API provides a fluent syntax for MIDI configuration.
 
-### midi Objekt
+### midi Object
 
-Hauptzugriffspunkt fuer alle MIDI-Operationen.
+Main entry point for all MIDI operations.
 
-### Geraete-Zugriff
+### Device Access
 
 ```csharp
-// Nach Index
-midi.device(0)                    // Erstes MIDI-Geraet
-midi.input(0)                     // Alias fuer device()
+// By index
+midi.device(0)                    // First MIDI device
+midi.input(0)                     // Alias for device()
 
-// Nach Name
-midi.device("Akai MPK")           // Geraet nach Name
-midi.input("Arturia KeyLab")      // Alias fuer device()
+// By name
+midi.device("Akai MPK")           // Device by name
+midi.input("Arturia KeyLab")      // Alias for device()
 ```
 
 ### MIDI Routing
 
 ```csharp
-// MIDI zu Synth routen
-midi.device(0).route(synth)       // Alle Noten vom Geraet zum Synth
+// Route MIDI to synth
+midi.device(0).route(synth)       // All notes from device to synth
 ```
 
 ### Control Change (CC) Mapping
 
 ```csharp
-// CC zu Parameter mappen
-midi.device(0).cc(1).to(synth, "filterCutoff")   // CC1 (Modwheel) zu Filter
-midi.device(0).cc(7).to(synth, "volume")         // CC7 zu Lautstaerke
-midi.device(0).cc(74).to(synth, "filterRes")     // CC74 zu Resonanz
+// Map CC to parameter
+midi.device(0).cc(1).to(synth, "filterCutoff")   // CC1 (Modwheel) to filter
+midi.device(0).cc(7).to(synth, "volume")         // CC7 to volume
+midi.device(0).cc(74).to(synth, "filterRes")     // CC74 to resonance
 ```
 
 ### Pitch Bend Mapping
 
 ```csharp
-// Pitch Bend zu Parameter mappen
+// Map pitch bend to parameter
 midi.device(0).pitchbend().to(synth, "pitch")
 ```
 
-### Playable Keys (Tasten-Bereiche)
+### Playable Keys (Key Ranges)
 
 ```csharp
-// Tasten-Bereich zu Synth mappen
-midi.playablekeys.range(21, 108).map(synth)              // Voller Klavierbereich
-midi.playablekeys.range(36, 60).from(0).map(synth)       // Untere Haelfte
-midi.playablekeys.range(60, 84).from("Akai").map(synth)  // Obere Haelfte
+// Map key range to synth
+midi.playablekeys.range(21, 108).map(synth)              // Full piano range
+midi.playablekeys.range(36, 60).from(0).map(synth)       // Lower half
+midi.playablekeys.range(60, 84).from("Akai").map(synth)  // Upper half
 
-// Mit Richtungsangabe
-midi.playablekeys.range(21, 108).low.to.high.map(synth)  // Normal (Standard)
-midi.playablekeys.range(21, 108).high.to.low.map(synth)  // Umgekehrt
+// With direction specification
+midi.playablekeys.range(21, 108).low.to.high.map(synth)  // Normal (default)
+midi.playablekeys.range(21, 108).high.to.low.map(synth)  // Reversed
 
-// Alternative Syntax
+// Alternative syntax
 midi.playablekeys.range(21, 108).low_to_high().map(synth)
 midi.playablekeys.range(21, 108).high_to_low().map(synth)
 ```
@@ -352,32 +352,32 @@ midi.playablekeys.range(21, 108).high_to_low().map(synth)
 ### MIDI Output
 
 ```csharp
-// MIDI-Ausgabe nach Index oder Name
-midi.output(0).noteOn(60, 100)      // Note an (Note, Velocity)
-midi.output(0).noteOff(60)          // Note aus
-midi.output(0).cc(1, 64)            // Control Change senden
+// MIDI output by index or name
+midi.output(0).noteOn(60, 100)      // Note on (note, velocity)
+midi.output(0).noteOff(60)          // Note off
+midi.output(0).cc(1, 64)            // Send control change
 
-// Mit Kanal
-midi.output(0).noteOn(60, 100, 1)   // Kanal 1 (0-basiert)
-midi.output("External Synth").cc(7, 100, 0)  // Nach Name
+// With channel
+midi.output(0).noteOn(60, 100, 1)   // Channel 1 (0-based)
+midi.output("External Synth").cc(7, 100, 0)  // By name
 ```
 
-### Beispiel
+### Example
 
 ```csharp
 var lead = CreateSynth();
 var bass = CreateSynth();
 
-// Tastatur aufteilen: untere Haelfte = Bass, obere = Lead
+// Split keyboard: lower half = bass, upper = lead
 midi.playablekeys.range(21, 59).from(0).map(bass);
 midi.playablekeys.range(60, 108).from(0).map(lead);
 
-// Controller mappen
+// Map controllers
 midi.device(0).cc(1).to(lead, "filterCutoff");
 midi.device(0).cc(74).to(lead, "filterRes");
 midi.device(0).pitchbend().to(lead, "pitch");
 
-// Einfaches Routing fuer zweites Keyboard
+// Simple routing for second keyboard
 midi.device(1).route(bass);
 
 Start();
@@ -387,50 +387,50 @@ Start();
 
 ## 7. Audio Controls
 
-Funktionen zur Steuerung der Audio-Ausgabe.
+Functions for controlling audio output.
 
-### audio Objekt
+### audio Object
 
-Hauptzugriffspunkt fuer Audio-Kontrolle.
+Main entry point for audio control.
 
-### Kanal-Lautstaerke
+### Channel Volume
 
 ```csharp
-// Einzelner Kanal
-audio.channel(0).gain(0.8)    // Kanal 0 auf 80%
-audio.channel(1).gain(1.2)    // Kanal 1 auf 120%
+// Single channel
+audio.channel(0).gain(0.8)    // Channel 0 to 80%
+audio.channel(1).gain(1.2)    // Channel 1 to 120%
 
-// Alle Kanaele
-audio.all.gain(0.5)           // Master-Lautstaerke auf 50%
+// All channels
+audio.all.gain(0.5)           // Master volume to 50%
 ```
 
-### Audio-Eingang (Frequenz-Trigger)
+### Audio Input (Frequency Triggers)
 
 ```csharp
-// Frequenzbereich ueberwachen
+// Monitor frequency range
 audio.input(0).onFrequency(100, 200)          // 100-200 Hz
-    .threshold(0.3)                            // Schwellwert
-    .trigger(synth, 36, 100);                  // Trigger Note 36
+    .threshold(0.3)                            // Threshold
+    .trigger(synth, 36, 100);                  // Trigger note 36
 
-// Mit benutzerdefinierter Aktion
+// With custom action
 audio.input(0).onFrequency(80, 120)
     .threshold(0.5)
     .trigger(magnitude => {
-        Print($"Kick erkannt! Staerke: {magnitude}");
+        Print($"Kick detected! Strength: {magnitude}");
     });
 ```
 
-### Beispiel
+### Example
 
 ```csharp
 var synth = CreateSynth();
 var pattern = CreatePattern(synth);
 
-// Lautstaerke-Balance einstellen
+// Set volume balance
 audio.channel(0).gain(0.8);
 audio.channel(1).gain(1.0);
 
-// Master auf 70%
+// Master to 70%
 audio.all.gain(0.7);
 
 Start();
@@ -440,94 +440,94 @@ Start();
 
 ## 8. VST Plugin API
 
-Funktionen zum Laden und Steuern von VST-Plugins.
+Functions for loading and controlling VST plugins.
 
-### vst Objekt
+### vst Object
 
-Hauptzugriffspunkt fuer VST-Operationen.
+Main entry point for VST operations.
 
-### Plugin-Verwaltung
+### Plugin Management
 
 ```csharp
-// Verfuegbare Plugins auflisten
-vst.list()                    // Alle entdeckten Plugins ausgeben
-vst.loaded()                  // Alle geladenen Plugins ausgeben
+// List available plugins
+vst.list()                    // Output all discovered plugins
+vst.loaded()                  // Output all loaded plugins
 ```
 
-### Plugin laden
+### Load Plugin
 
 ```csharp
-// Nach Name oder Pfad
-var plugin = vst.load("Serum")                          // Nach Name
-var plugin = vst.load("C:/VST/Serum.dll")               // Nach Pfad
+// By name or path
+var plugin = vst.load("Serum")                          // By name
+var plugin = vst.load("C:/VST/Serum.dll")               // By path
 
-// Nach Index
-var plugin = vst.load(0)                                // Erstes Plugin
+// By index
+var plugin = vst.load(0)                                // First plugin
 ```
 
-### Plugin abrufen
+### Get Plugin
 
 ```csharp
-// Bereits geladenes Plugin abrufen
+// Get already loaded plugin
 var serum = vst.get("Serum")
 var serum = vst.plugin("Serum")    // Alias
 ```
 
-### Plugin-Steuerung (Fluent API)
+### Plugin Control (Fluent API)
 
 ```csharp
-// MIDI-Routing
-plugin.from(0)                     // MIDI von Geraet 0
-plugin.from("Akai MPK")            // MIDI nach Geraetename
+// MIDI routing
+plugin.from(0)                     // MIDI from device 0
+plugin.from("Akai MPK")            // MIDI by device name
 
-// Parameter setzen
-plugin.param("cutoff", 0.5)        // Nach Parametername
-plugin.param(12, 0.7)              // Nach Parameterindex
-plugin.volume(0.8)                 // Lautstaerke
+// Set parameters
+plugin.param("cutoff", 0.5)        // By parameter name
+plugin.param(12, 0.7)              // By parameter index
+plugin.volume(0.8)                 // Volume
 
-// Noten senden
-plugin.noteOn(60, 100)             // Note an
-plugin.noteOff(60)                 // Note aus
-plugin.allNotesOff()               // Alle Noten aus
+// Send notes
+plugin.noteOn(60, 100)             // Note on
+plugin.noteOff(60)                 // Note off
+plugin.allNotesOff()               // All notes off
 
-// MIDI-Nachrichten
-plugin.cc(1, 64)                   // Control Change
-plugin.cc(74, 100, 1)              // CC auf Kanal 1
-plugin.program(5)                  // Program Change
-plugin.pitchBend(8192)             // Pitch Bend (Mitte = 8192)
+// MIDI messages
+plugin.cc(1, 64)                   // Control change
+plugin.cc(74, 100, 1)              // CC on channel 1
+plugin.program(5)                  // Program change
+plugin.pitchBend(8192)             // Pitch bend (center = 8192)
 ```
 
-### Direkte Funktionen
+### Direct Functions
 
 ```csharp
-// Alternative direkte Aufrufe
-var plugin = LoadVst("Serum")           // Plugin laden
-var plugin = LoadVstByIndex(0)          // Nach Index laden
-var plugin = GetVst("Serum")            // Geladenes abrufen
-RouteToVst(0, plugin)                   // MIDI routen
-ListVstPlugins()                        // Plugins auflisten
-ListLoadedVstPlugins()                  // Geladene auflisten
+// Alternative direct calls
+var plugin = LoadVst("Serum")           // Load plugin
+var plugin = LoadVstByIndex(0)          // Load by index
+var plugin = GetVst("Serum")            // Get loaded
+RouteToVst(0, plugin)                   // Route MIDI
+ListVstPlugins()                        // List plugins
+ListLoadedVstPlugins()                  // List loaded
 ```
 
-### Beispiel
+### Example
 
 ```csharp
-// Alle Plugins anzeigen
+// Show all plugins
 vst.list();
 
-// Plugin laden und konfigurieren
+// Load and configure plugin
 var serum = vst.load("Serum");
 if (serum != null)
 {
-    serum.from(0)                    // MIDI von erstem Keyboard
-         .param("cutoff", 0.7)       // Filter einstellen
+    serum.from(0)                    // MIDI from first keyboard
+         .param("cutoff", 0.7)       // Set filter
          .param("resonance", 0.3)
-         .volume(0.8);               // Lautstaerke
+         .volume(0.8);               // Volume
 
-    // Testton spielen
+    // Play test tone
     serum.noteOn(60, 100);
 
-    // CC-Mapping
+    // CC mapping
     midi.device(0).cc(1).to(serum.Plugin, "cutoff");
 }
 
@@ -538,69 +538,69 @@ Start();
 
 ## 9. Sample Fluent API
 
-Die Sample Fluent API bietet eine elegante Syntax fuer Sample-Instrumente.
+The Sample Fluent API provides an elegant syntax for sample instruments.
 
-### samples Objekt
+### samples Object
 
-Hauptzugriffspunkt fuer Sample-Operationen.
+Main entry point for sample operations.
 
-### Sampler erstellen
+### Create Sampler
 
 ```csharp
-// Leeren Sampler erstellen
+// Create empty sampler
 var sampler = samples.create()
-var sampler = samples.create("MeinSampler")    // Mit Name
+var sampler = samples.create("MySampler")    // With name
 ```
 
-### Sample laden
+### Load Sample
 
 ```csharp
-// Einzelnes Sample als Instrument
-var piano = samples.load("C:/Samples/piano.wav")           // Standard Root = C4 (60)
+// Single sample as instrument
+var piano = samples.load("C:/Samples/piano.wav")           // Default root = C4 (60)
 var piano = samples.load("C:/Samples/piano.wav", 48)       // Root = C3 (48)
 ```
 
-### Aus Verzeichnis laden
+### Load from Directory
 
 ```csharp
-// Alle Samples aus einem Ordner
+// All samples from a folder
 var kit = samples.fromDirectory("C:/Samples/DrumKit/")
 ```
 
-### Builder-Methoden (verkettbar)
+### Builder Methods (chainable)
 
 ```csharp
-// Sample zu Note mappen
-.map("kick.wav", 36)              // Sample auf Note 36 (C2)
-.map("snare.wav", 38)             // Sample auf Note 38 (D2)
+// Map sample to note
+.map("kick.wav", 36)              // Sample to note 36 (C2)
+.map("snare.wav", 38)             // Sample to note 38 (D2)
 
-// Verzeichnis setzen
-.directory("C:/Samples/")         // Basisverzeichnis fuer relative Pfade
+// Set directory
+.directory("C:/Samples/")         // Base directory for relative paths
 
-// Lautstaerke
-.volume(0.8)                      // 80% Lautstaerke
+// Volume
+.volume(0.8)                      // 80% volume
 
 // Name
-.name("DrumKit")                  // Name setzen
+.name("DrumKit")                  // Set name
 
-// Pattern erstellen
-.pattern()                        // Gibt Pattern zurueck
+// Create pattern
+.pattern()                        // Returns pattern
 ```
 
-### Sampler-Objekt abrufen
+### Get Sampler Object
 
 ```csharp
-// Das SampleInstrument-Objekt abrufen
+// Get the SampleInstrument object
 var sampler = samples.create().Sampler
 
-// Implizite Konvertierung
+// Implicit conversion
 SampleInstrument sampler = samples.create();
 ```
 
-### Beispiel
+### Example
 
 ```csharp
-// Einfaches Drum-Kit erstellen
+// Create simple drum kit
 var drums = samples.create("DrumKit")
     .directory("C:/Samples/Drums/")
     .map("kick.wav", 36)
@@ -609,25 +609,25 @@ var drums = samples.create("DrumKit")
     .map("hihat_open.wav", 46)
     .volume(0.9);
 
-// Pattern fuer Drums
+// Pattern for drums
 var drumPattern = drums.pattern();
-drumPattern.AddNote(0, 36, 100, 0.25);    // Kick auf Beat 1
-drumPattern.AddNote(1, 38, 100, 0.25);    // Snare auf Beat 2
-drumPattern.AddNote(2, 36, 100, 0.25);    // Kick auf Beat 3
-drumPattern.AddNote(3, 38, 100, 0.25);    // Snare auf Beat 4
+drumPattern.AddNote(0, 36, 100, 0.25);    // Kick on beat 1
+drumPattern.AddNote(1, 38, 100, 0.25);    // Snare on beat 2
+drumPattern.AddNote(2, 36, 100, 0.25);    // Kick on beat 3
+drumPattern.AddNote(3, 38, 100, 0.25);    // Snare on beat 4
 
-// HiHat-Pattern
+// HiHat pattern
 for (int i = 0; i < 8; i++)
 {
-    drumPattern.AddNote(i * 0.5, 42, 80, 0.1);  // HiHat auf 8tel
+    drumPattern.AddNote(i * 0.5, 42, 80, 0.1);  // HiHat on 8th notes
 }
 
-// Piano aus Sample-Datei
+// Piano from sample file
 var piano = samples.load("C:/Samples/grand_piano_c4.wav", 60)
     .name("GrandPiano")
     .volume(0.7);
 
-// MIDI zu Piano routen
+// Route MIDI to piano
 midi.device(0).route(piano.Sampler);
 
 SetBpm(100);
@@ -636,13 +636,13 @@ Start();
 
 ---
 
-## 10. Hilfsfunktionen
+## 10. Helper Functions
 
-Nuetzliche Helfer fuer Skripte.
+Useful helpers for scripts.
 
 ### Print(message)
 
-Gibt eine Nachricht auf der Konsole aus.
+Outputs a message to the console.
 
 ```csharp
 void Print(string message)
@@ -650,7 +650,7 @@ void Print(string message)
 
 ### Random(min, max)
 
-Generiert eine zufaellige Fliesskommazahl.
+Generates a random floating-point number.
 
 ```csharp
 float Random(float min, float max)
@@ -658,55 +658,55 @@ float Random(float min, float max)
 
 ### RandomInt(min, max)
 
-Generiert eine zufaellige Ganzzahl.
+Generates a random integer.
 
 ```csharp
 int RandomInt(int min, int max)
 ```
 
-### Beispiel
+### Example
 
 ```csharp
-Print("Skript gestartet!");
+Print("Script started!");
 
-// Zufaellige Noten generieren
+// Generate random notes
 var synth = CreateSynth();
 var pattern = CreatePattern(synth);
 
 for (int i = 0; i < 16; i++)
 {
-    int note = RandomInt(48, 72);           // Zufaellige Note C3-C5
-    int velocity = RandomInt(60, 127);      // Zufaellige Velocity
-    float duration = Random(0.1f, 0.5f);    // Zufaellige Dauer
+    int note = RandomInt(48, 72);           // Random note C3-C5
+    int velocity = RandomInt(60, 127);      // Random velocity
+    float duration = Random(0.1f, 0.5f);    // Random duration
 
     pattern.AddNote(i * 0.25, note, velocity, duration);
 }
 
-Print($"Pattern mit 16 zufaelligen Noten erstellt");
+Print($"Pattern created with 16 random notes");
 SetBpm(120);
 Start();
 ```
 
 ---
 
-## 11. Frequenz-Trigger
+## 11. Frequency Triggers
 
-Erweiterte Funktionen fuer frequenzbasierte Trigger von Audio-Eingaengen.
+Advanced functions for frequency-based triggers from audio inputs.
 
 ### AddFrequencyTrigger
 
-Fuegt einen Frequenz-Trigger hinzu, der auf bestimmte Frequenzbereiche reagiert.
+Adds a frequency trigger that responds to specific frequency ranges.
 
 ```csharp
 void AddFrequencyTrigger(int deviceIndex, float low, float high, float threshold, Action<float> action)
 ```
 
-**Parameter:**
-- `deviceIndex` - Index des Audio-Eingangs
-- `low` - Untere Frequenzgrenze in Hz
-- `high` - Obere Frequenzgrenze in Hz
-- `threshold` - Schwellwert fuer die Ausloesung (0.0 - 1.0)
-- `action` - Aktion, die mit der Magnitude aufgerufen wird
+**Parameters:**
+- `deviceIndex` - Audio input device index
+- `low` - Lower frequency limit in Hz
+- `high` - Upper frequency limit in Hz
+- `threshold` - Threshold for triggering (0.0 - 1.0)
+- `action` - Action called with the magnitude
 
 ### Fluent API Syntax
 
@@ -714,32 +714,32 @@ void AddFrequencyTrigger(int deviceIndex, float low, float high, float threshold
 audio.input(0)
     .onFrequency(lowHz, highHz)
     .threshold(value)
-    .trigger(synth, note, velocity)    // Oder benutzerdefinierte Aktion
+    .trigger(synth, note, velocity)    // Or custom action
 ```
 
-### Beispiel: Drum-Trigger
+### Example: Drum Triggers
 
 ```csharp
 var drums = samples.create("DrumTrigger")
     .map("kick_sample.wav", 36)
     .map("snare_sample.wav", 38);
 
-// Kick-Drum auf tiefe Frequenzen triggern
+// Trigger kick drum on low frequencies
 audio.input(0).onFrequency(50, 150)
     .threshold(0.4)
     .trigger(drums.Sampler, 36, 100);
 
-// Snare auf mittlere Frequenzen triggern
+// Trigger snare on mid frequencies
 audio.input(0).onFrequency(200, 400)
     .threshold(0.3)
     .trigger(drums.Sampler, 38, 80);
 
-// Benutzerdefinierte Aktion fuer hohe Frequenzen
+// Custom action for high frequencies
 audio.input(0).onFrequency(2000, 5000)
     .threshold(0.2)
     .trigger(magnitude => {
-        Print($"Hohe Frequenz erkannt: {magnitude:F2}");
-        // Hier koennten weitere Aktionen folgen
+        Print($"High frequency detected: {magnitude:F2}");
+        // Additional actions could follow here
     });
 
 Start();
@@ -749,11 +749,11 @@ Start();
 
 ## MIDI Transport Mapping
 
-Funktionen zum Mappen von MIDI-Controllern auf Transport-Funktionen.
+Functions for mapping MIDI controllers to transport functions.
 
 ### MapBpm(deviceIndex, cc)
 
-Mappt einen MIDI CC auf BPM-Steuerung (60-200 BPM).
+Maps a MIDI CC to BPM control (60-200 BPM).
 
 ```csharp
 void MapBpm(int deviceIndex, int cc)
@@ -761,7 +761,7 @@ void MapBpm(int deviceIndex, int cc)
 
 ### MapStart(deviceIndex, note)
 
-Mappt eine MIDI-Note zum Starten des Sequenzers.
+Maps a MIDI note to start the sequencer.
 
 ```csharp
 void MapStart(int deviceIndex, int note)
@@ -769,7 +769,7 @@ void MapStart(int deviceIndex, int note)
 
 ### MapStop(deviceIndex, note)
 
-Mappt eine MIDI-Note zum Stoppen des Sequenzers.
+Maps a MIDI note to stop the sequencer.
 
 ```csharp
 void MapStop(int deviceIndex, int note)
@@ -777,7 +777,7 @@ void MapStop(int deviceIndex, int note)
 
 ### MapSkip(deviceIndex, cc, beats)
 
-Mappt einen MIDI CC zum Ueberspringen von Beats.
+Maps a MIDI CC to skip beats.
 
 ```csharp
 void MapSkip(int deviceIndex, int cc, double beats)
@@ -785,36 +785,36 @@ void MapSkip(int deviceIndex, int cc, double beats)
 
 ### MapScratch(deviceIndex, cc, scale)
 
-Mappt einen MIDI CC fuer Scratching-Verhalten.
+Maps a MIDI CC for scratching behavior.
 
 ```csharp
 void MapScratch(int deviceIndex, int cc, double scale = 16.0)
 ```
 
-### Beispiel
+### Example
 
 ```csharp
-// Transport-Steuerung ueber MIDI
-MapStart(0, 60);        // C4 startet Sequenzer
-MapStop(0, 61);         // C#4 stoppt Sequenzer
-MapBpm(0, 20);          // CC20 steuert BPM
-MapSkip(0, 21, 4);      // CC21 springt 4 Beats
+// Transport control via MIDI
+MapStart(0, 60);        // C4 starts sequencer
+MapStop(0, 61);         // C#4 stops sequencer
+MapBpm(0, 20);          // CC20 controls BPM
+MapSkip(0, 21, 4);      // CC21 skips 4 beats
 
-// Scratching mit Jog-Wheel
-MapScratch(0, 22, 32);  // CC22 fuer Scratch, 32 Beats Bereich
+// Scratching with jog wheel
+MapScratch(0, 22, 32);  // CC22 for scratch, 32 beat range
 
 Start();
 ```
 
 ---
 
-## Direkte MIDI-Routing Funktionen
+## Direct MIDI Routing Functions
 
-Niedrigere Ebene fuer direktes MIDI-Routing.
+Lower level for direct MIDI routing.
 
 ### RouteMidi(deviceIndex, synth)
 
-Routet MIDI-Eingabe direkt zu einem Synthesizer.
+Routes MIDI input directly to a synthesizer.
 
 ```csharp
 void RouteMidi(int deviceIndex, ISynth synth)
@@ -822,7 +822,7 @@ void RouteMidi(int deviceIndex, ISynth synth)
 
 ### MapControl(deviceIndex, cc, synth, param)
 
-Mappt einen MIDI CC direkt zu einem Synth-Parameter.
+Maps a MIDI CC directly to a synth parameter.
 
 ```csharp
 void MapControl(int deviceIndex, int cc, ISynth synth, string param)
@@ -830,7 +830,7 @@ void MapControl(int deviceIndex, int cc, ISynth synth, string param)
 
 ### MapPitchBend(deviceIndex, synth, param)
 
-Mappt Pitch Bend zu einem Synth-Parameter.
+Maps pitch bend to a synth parameter.
 
 ```csharp
 void MapPitchBend(int deviceIndex, ISynth synth, string param)
@@ -838,19 +838,19 @@ void MapPitchBend(int deviceIndex, ISynth synth, string param)
 
 ---
 
-## Vollstaendiges Beispiel
+## Complete Example
 
 ```csharp
 // ============================================
-// MusicEngine Live-Performance Setup
+// MusicEngine Live Performance Setup
 // ============================================
 
-// === Instrumente erstellen ===
+// === Create instruments ===
 var lead = CreateSynth();
 var bass = CreateSynth();
 var pad = CreateSynth();
 
-// Drum-Kit aus Samples
+// Drum kit from samples
 var drums = samples.create("DrumKit")
     .directory("C:/Samples/Drums/")
     .map("kick.wav", 36)
@@ -859,7 +859,7 @@ var drums = samples.create("DrumKit")
     .map("crash.wav", 49)
     .volume(0.9);
 
-// VST-Plugin laden
+// Load VST plugin
 var reverb = vst.load("ValhallaRoom");
 if (reverb != null)
 {
@@ -867,42 +867,42 @@ if (reverb != null)
           .param("mix", 0.3);
 }
 
-// === MIDI-Routing ===
-// Keyboard 1: Split - Bass links, Lead rechts
+// === MIDI routing ===
+// Keyboard 1: Split - bass left, lead right
 midi.playablekeys.range(21, 59).from(0).map(bass);
 midi.playablekeys.range(60, 108).from(0).map(lead);
 
 // Keyboard 2: Pad
 midi.device(1).route(pad);
 
-// Drum-Pad: Drums
+// Drum pad: Drums
 midi.device("Akai MPD").route(drums.Sampler);
 
-// === CC-Mapping ===
+// === CC mapping ===
 midi.device(0).cc(1).to(lead, "filterCutoff");
 midi.device(0).cc(74).to(lead, "filterRes");
 midi.device(0).pitchbend().to(lead, "pitch");
 
 // === Transport ===
-MapStart(0, 120);   // Pad-Taste startet
-MapStop(0, 121);    // Pad-Taste stoppt
-MapBpm(0, 20);      // Fader fuer BPM
+MapStart(0, 120);   // Pad button starts
+MapStop(0, 121);    // Pad button stops
+MapBpm(0, 20);      // Fader for BPM
 
 // === Patterns ===
 var drumPattern = drums.pattern();
-// 4/4 Beat
+// 4/4 beat
 drumPattern.AddNote(0, 36, 100, 0.1);     // Kick
 drumPattern.AddNote(1, 38, 100, 0.1);     // Snare
 drumPattern.AddNote(2, 36, 100, 0.1);     // Kick
 drumPattern.AddNote(3, 38, 100, 0.1);     // Snare
 
-// HiHat auf 8tel
+// HiHat on 8th notes
 for (int i = 0; i < 8; i++)
 {
     drumPattern.AddNote(i * 0.5, 42, 70, 0.05);
 }
 
-// === Audio-Einstellungen ===
+// === Audio settings ===
 audio.channel(0).gain(0.8);   // Lead
 audio.channel(1).gain(0.9);   // Bass
 audio.channel(2).gain(0.6);   // Pad
@@ -911,138 +911,138 @@ audio.all.gain(0.85);         // Master
 
 // === Start ===
 SetBpm(128);
-Print("Setup komplett! Druecke Start-Taste zum Spielen.");
+Print("Setup complete! Press start button to play.");
 ```
 
 ---
 
-## Hinweise
+## Notes
 
-- Alle Pfade sollten absolute Pfade sein oder relativ zum Arbeitsverzeichnis.
-- MIDI-Geraete werden bei Index 0 beginnend nummeriert.
-- BPM-Bereich: typischerweise 60-200 BPM.
-- Velocity-Bereich: 0-127 (MIDI-Standard).
-- Noten-Bereich: 0-127 (MIDI-Standard, C4 = 60).
-- Gain/Volume-Werte: 0.0 = stumm, 1.0 = normal, >1.0 = Verstaerkung.
+- All paths should be absolute paths or relative to the working directory.
+- MIDI devices are numbered starting at index 0.
+- BPM range: typically 60-200 BPM.
+- Velocity range: 0-127 (MIDI standard).
+- Note range: 0-127 (MIDI standard, C4 = 60).
+- Gain/volume values: 0.0 = mute, 1.0 = normal, >1.0 = amplification.
 
 ---
 
 ## 12. Virtual Audio Channels
 
-Die Virtual Audio Channel API ermoeglicht das Routen von Audio zu anderen Anwendungen ueber Named Pipes. Dies kann als virtuelles Mikrofon oder Audio-Input fuer andere Programme verwendet werden.
+The Virtual Audio Channel API enables routing audio to other applications via Named Pipes. This can be used as a virtual microphone or audio input for other programs.
 
-### virtualChannels Objekt
+### virtualChannels Object
 
-Hauptzugriffspunkt fuer Virtual Audio Channel Operationen.
+Main entry point for Virtual Audio Channel operations.
 
-### Kanal erstellen
+### Create Channel
 
 ```csharp
-// Neuen virtuellen Kanal erstellen
-var channel = virtualChannels.create("MeinKanal")
+// Create new virtual channel
+var channel = virtualChannels.create("MyChannel")
 
-// Mit Verkettung
+// With chaining
 var channel = virtualChannels.create("Output")
     .volume(0.8)
     .start();
 ```
 
-### Kanaele auflisten
+### List Channels
 
 ```csharp
-// Alle virtuellen Kanaele anzeigen
+// Show all virtual channels
 virtualChannels.list()
 ```
 
-### Builder-Methoden
+### Builder Methods
 
 ```csharp
-// Lautstaerke setzen
-.volume(0.8)              // 80% Lautstaerke
+// Set volume
+.volume(0.8)              // 80% volume
 
-// Kanal starten
-.start()                  // Startet den Pipe-Server
+// Start channel
+.start()                  // Starts the pipe server
 
-// Kanal stoppen
-.stop()                   // Stoppt den Pipe-Server
+// Stop channel
+.stop()                   // Stops the pipe server
 
-// Pipe-Name abrufen
-.pipeName                 // Gibt den Namen der Pipe zurueck
+// Get pipe name
+.pipeName                 // Returns the pipe name
 ```
 
-### Direkter Zugriff
+### Direct Access
 
 ```csharp
-// Kanal-Objekt abrufen
+// Get channel object
 var channel = virtualChannels.create("Audio").Channel
 
-// Implizite Konvertierung
+// Implicit conversion
 VirtualAudioChannel channel = virtualChannels.create("Audio");
 ```
 
-### Direkte Funktionen
+### Direct Functions
 
 ```csharp
-// Alternative direkte Aufrufe
-var channel = CreateVirtualChannel("MeinKanal")
+// Alternative direct calls
+var channel = CreateVirtualChannel("MyChannel")
 ListVirtualChannels()
 ```
 
-### Verwendung mit anderen Programmen
+### Usage with Other Programs
 
-Der virtuelle Kanal erstellt eine Named Pipe mit dem Namen `MusicEngine_[Kanalname]`.
+The virtual channel creates a Named Pipe with the name `MusicEngine_[ChannelName]`.
 
-Andere Programme koennen sich mit dieser Pipe verbinden um Audio zu empfangen:
+Other programs can connect to this pipe to receive audio:
 
-**Python Beispiel:**
+**Python Example:**
 ```python
 import struct
 
-pipe_path = r'\\.\pipe\MusicEngine_MeinKanal'
+pipe_path = r'\\.\pipe\MusicEngine_MyChannel'
 with open(pipe_path, 'rb') as pipe:
-    # Header lesen (SampleRate, Channels, BitsPerSample)
+    # Read header (SampleRate, Channels, BitsPerSample)
     header = pipe.read(12)
     sample_rate, channels, bits = struct.unpack('III', header)
 
-    # Audio-Daten lesen
+    # Read audio data
     while True:
         data = pipe.read(4096)
         if not data:
             break
-        # Float-Samples verarbeiten...
+        # Process float samples...
 ```
 
-**C# Beispiel:**
+**C# Example:**
 ```csharp
-using var pipe = new NamedPipeClientStream(".", "MusicEngine_MeinKanal", PipeDirection.In);
+using var pipe = new NamedPipeClientStream(".", "MusicEngine_MyChannel", PipeDirection.In);
 pipe.Connect();
 
-// Header lesen
+// Read header
 var headerBuffer = new byte[12];
 pipe.Read(headerBuffer, 0, 12);
 int sampleRate = BitConverter.ToInt32(headerBuffer, 0);
 int channels = BitConverter.ToInt32(headerBuffer, 4);
 
-// Audio lesen
+// Read audio
 var buffer = new byte[4096];
 while (pipe.Read(buffer, 0, buffer.Length) > 0)
 {
-    // Float-Samples verarbeiten...
+    // Process float samples...
 }
 ```
 
-### Beispiel: Audio zu Discord/OBS routen
+### Example: Route Audio to Discord/OBS
 
 ```csharp
-// Virtuellen Kanal fuer Streaming erstellen
+// Create virtual channel for streaming
 var streamOutput = virtualChannels.create("StreamAudio")
     .volume(1.0)
     .start();
 
-Print($"Stream-Kanal erstellt: {streamOutput.pipeName}");
-Print("Verbinde dein Streaming-Tool mit dieser Pipe!");
+Print($"Stream channel created: {streamOutput.pipeName}");
+Print("Connect your streaming tool to this pipe!");
 
-// Normale Audio-Instrumente
+// Normal audio instruments
 var synth = CreateSynth();
 var pattern = CreatePattern(synth);
 
@@ -1055,17 +1055,17 @@ SetBpm(120);
 Start();
 ```
 
-### Beispiel: Mehrere Kanaele fuer Multitrack
+### Example: Multiple Channels for Multitrack
 
 ```csharp
-// Separate Kanaele fuer verschiedene Instrumente
+// Separate channels for different instruments
 var drumsChannel = virtualChannels.create("Drums").start();
 var bassChannel = virtualChannels.create("Bass").start();
 var leadsChannel = virtualChannels.create("Leads").start();
 
-virtualChannels.list();  // Alle Kanaele anzeigen
+virtualChannels.list();  // Show all channels
 
-// Andere Programme koennen jetzt einzelne Spuren aufnehmen
+// Other programs can now record individual tracks
 ```
 
 ---
