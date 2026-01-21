@@ -189,6 +189,4 @@ synth.res = 2.0;
 synth.fc = 800;  // filter cutoff
 ```
 
-## Ready for Customization
 
-Review these scripts, note the syntax you want to change, and Claude will implement your custom scripting language while maintaining all functionality!
