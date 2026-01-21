@@ -84,7 +84,9 @@ public class Vst3Plugin : IVst3Plugin
 
     // State flags
     private bool _isActive;
+#pragma warning disable CS0169 // Reserved for VST3 processing state tracking
     private bool _isProcessing;
+#pragma warning restore CS0169
     private bool _isDisposed;
     private readonly object _lock = new();
 

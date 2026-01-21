@@ -48,6 +48,9 @@ public class SimpleSynth : ISynth
     // Note on event to start a note
     public void NoteOn(int note, int velocity)
     {
+        MidiValidation.ValidateNote(note);
+        MidiValidation.ValidateVelocity(velocity);
+
         lock (_lock)
         {
             var frequency = (float)(440.0 * Math.Pow(2.0, (note - 69.0) / 12.0)); // Convert MIDI note to frequency
@@ -55,10 +58,12 @@ public class SimpleSynth : ISynth
             _activeOscillators.Add(osc); // Add to active oscillators
         }
     }
-    
+
     // Note off event to stop a note
     public void NoteOff(int note)
     {
+        MidiValidation.ValidateNote(note);
+
         lock (_lock)
         {
             var frequency = (float)(440.0 * Math.Pow(2.0, (note - 69.0) / 12.0)); // Convert MIDI note to frequency

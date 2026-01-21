@@ -739,6 +739,9 @@ public class VstPlugin : IVstPlugin
     /// </summary>
     public void NoteOn(int note, int velocity)
     {
+        MidiValidation.ValidateNote(note);
+        MidiValidation.ValidateVelocity(velocity);
+
         lock (_lock)
         {
             _activeNotes.Add((note, velocity));
@@ -746,8 +749,8 @@ public class VstPlugin : IVstPlugin
             {
                 DeltaFrames = 0,
                 Status = 0x90, // Note On, channel 1
-                Data1 = (byte)Math.Clamp(note, 0, 127),
-                Data2 = (byte)Math.Clamp(velocity, 0, 127)
+                Data1 = (byte)note,
+                Data2 = (byte)velocity
             });
         }
     }
@@ -757,6 +760,8 @@ public class VstPlugin : IVstPlugin
     /// </summary>
     public void NoteOff(int note)
     {
+        MidiValidation.ValidateNote(note);
+
         lock (_lock)
         {
             _activeNotes.RemoveAll(n => n.note == note);
@@ -764,7 +769,7 @@ public class VstPlugin : IVstPlugin
             {
                 DeltaFrames = 0,
                 Status = 0x80, // Note Off, channel 1
-                Data1 = (byte)Math.Clamp(note, 0, 127),
+                Data1 = (byte)note,
                 Data2 = 0
             });
         }
@@ -805,12 +810,16 @@ public class VstPlugin : IVstPlugin
     /// </summary>
     public void SendControlChange(int channel, int controller, int value)
     {
+        MidiValidation.ValidateChannel(channel);
+        MidiValidation.ValidateController(controller);
+        MidiValidation.ValidateVelocity(value); // CC values are 0-127 like velocity
+
         _midiEventQueue.Enqueue(new VstMidiEventInternal
         {
             DeltaFrames = 0,
-            Status = (byte)(0xB0 | (channel & 0x0F)),
-            Data1 = (byte)Math.Clamp(controller, 0, 127),
-            Data2 = (byte)Math.Clamp(value, 0, 127)
+            Status = (byte)(0xB0 | channel),
+            Data1 = (byte)controller,
+            Data2 = (byte)value
         });
     }
 
@@ -819,13 +828,15 @@ public class VstPlugin : IVstPlugin
     /// </summary>
     public void SendPitchBend(int channel, int value)
     {
-        int clampedValue = Math.Clamp(value, 0, 16383);
+        MidiValidation.ValidateChannel(channel);
+        MidiValidation.ValidatePitchBend(value);
+
         _midiEventQueue.Enqueue(new VstMidiEventInternal
         {
             DeltaFrames = 0,
-            Status = (byte)(0xE0 | (channel & 0x0F)),
-            Data1 = (byte)(clampedValue & 0x7F),
-            Data2 = (byte)((clampedValue >> 7) & 0x7F)
+            Status = (byte)(0xE0 | channel),
+            Data1 = (byte)(value & 0x7F),
+            Data2 = (byte)((value >> 7) & 0x7F)
         });
     }
 
@@ -834,11 +845,14 @@ public class VstPlugin : IVstPlugin
     /// </summary>
     public void SendProgramChange(int channel, int program)
     {
+        MidiValidation.ValidateChannel(channel);
+        MidiValidation.ValidateProgram(program);
+
         _midiEventQueue.Enqueue(new VstMidiEventInternal
         {
             DeltaFrames = 0,
-            Status = (byte)(0xC0 | (channel & 0x0F)),
-            Data1 = (byte)Math.Clamp(program, 0, 127),
+            Status = (byte)(0xC0 | channel),
+            Data1 = (byte)program,
             Data2 = 0
         });
     }

@@ -53,10 +53,11 @@
       <PackageReference Include="Serilog.Enrichers.Thread" Version="4.0.0" />
     </ItemGroup>
 
-    <!-- Code Quality -->
-    <ItemGroup>
-      <PackageReference Include="Microsoft.CodeAnalysis.NetAnalyzers" Version="8.0.0" />
-    </ItemGroup>
+    <!-- Code Quality - Using SDK built-in analyzers -->
+    <PropertyGroup>
+      <EnableNETAnalyzers>true</EnableNETAnalyzers>
+      <AnalysisLevel>latest</AnalysisLevel>
+    </PropertyGroup>
 
     <!-- Configuration Files -->
     <ItemGroup>

@@ -360,7 +360,9 @@ internal class PhysicalVoice
     // Secondary delay for pickup position
     private float[] _delayLine2;
     private int _delayLength2;
+#pragma warning disable CS0414 // Reserved for future pickup position feature
     private int _writeIndex2;
+#pragma warning restore CS0414
 
     // Filter states
     private float _filterState1;
@@ -371,9 +373,11 @@ internal class PhysicalVoice
     private float _bodyState1;
     private float _bodyState2;
 
-    // Bowed string state
+    // Bowed string state - reserved for future bowed instrument synthesis
+#pragma warning disable CS0169
     private float _bowPosition;
     private float _bowForce;
+#pragma warning restore CS0169
 
     // Envelope
     private float _exciterEnv;

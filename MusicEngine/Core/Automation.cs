@@ -362,7 +362,9 @@ public class AutomationRecorder
     private object? _targetObject;
     private string _propertyName = "";
     private bool _isRecording;
+#pragma warning disable CS0414 // Reserved for relative timestamp recording
     private double _recordStartTime;
+#pragma warning restore CS0414
     private float _lastRecordedValue = float.NaN;
     private double _lastRecordedTime = double.NegativeInfinity;
 

@@ -91,6 +91,10 @@ public class AudioEngine : IDisposable
         {
             _midiInputRouting[deviceIndex] = synth; // Route MIDI input to synth
         }
+
+        var deviceName = _midiInputNames.TryGetValue(deviceIndex, out var name) ? name : null;
+        MidiRoutingChanged?.Invoke(this, new MidiRoutingEventArgs(deviceIndex, deviceName, synth.Name));
+        _logger?.LogDebug("MIDI input {DeviceIndex} routed to {SynthName}", deviceIndex, synth.Name);
     }
     
     // Map a MIDI control change to a synth parameter

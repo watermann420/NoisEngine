@@ -179,6 +179,9 @@ public class Arpeggiator : IDisposable
     /// </summary>
     public void NoteOn(int note, int velocity)
     {
+        MidiValidation.ValidateNote(note);
+        MidiValidation.ValidateVelocity(velocity);
+
         lock (_lock)
         {
             if (!_heldNotes.Contains(note))
@@ -195,6 +198,7 @@ public class Arpeggiator : IDisposable
     /// </summary>
     public void NoteOff(int note)
     {
+        MidiValidation.ValidateNote(note);
         if (Latch) return; // Don't remove notes in latch mode
 
         lock (_lock)

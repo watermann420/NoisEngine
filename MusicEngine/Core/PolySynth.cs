@@ -226,6 +226,9 @@ public class PolySynth : ISynth
     /// </summary>
     public void NoteOn(int note, int velocity)
     {
+        MidiValidation.ValidateNote(note);
+        MidiValidation.ValidateVelocity(velocity);
+
         lock (_lock)
         {
             // Check if this note is already playing
@@ -258,6 +261,8 @@ public class PolySynth : ISynth
     /// </summary>
     public void NoteOff(int note)
     {
+        MidiValidation.ValidateNote(note);
+
         lock (_lock)
         {
             if (_noteToVoice.TryGetValue(note, out int voiceIndex))

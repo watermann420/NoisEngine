@@ -160,18 +160,18 @@ public class ArpeggiatorTests
     }
 
     [Theory]
-    [InlineData(ArpNoteDuration.Whole, 4.0)]
-    [InlineData(ArpNoteDuration.Half, 2.0)]
-    [InlineData(ArpNoteDuration.Quarter, 1.0)]
-    [InlineData(ArpNoteDuration.Eighth, 0.5)]
-    [InlineData(ArpNoteDuration.Sixteenth, 0.25)]
-    public void Rate_ControlsNoteTiming(ArpNoteDuration rate, double expectedBeatsPerNote)
+    [InlineData(ArpNoteDuration.Whole)]
+    [InlineData(ArpNoteDuration.Half)]
+    [InlineData(ArpNoteDuration.Quarter)]
+    [InlineData(ArpNoteDuration.Eighth)]
+    [InlineData(ArpNoteDuration.Sixteenth)]
+    public void Rate_ControlsNoteTiming(ArpNoteDuration rate)
     {
         var synth = new MockSynth();
         var arp = new Arpeggiator(synth);
         arp.Rate = rate;
 
-        // Just verify the setting is applied
+        // Verify the setting is applied
         arp.Rate.Should().Be(rate);
     }
 

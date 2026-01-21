@@ -62,6 +62,10 @@ public class Pattern
     /// <returns>This pattern for chaining</returns>
     public Pattern Note(int note, double beat, double duration, int velocity)
     {
+        MidiValidation.ValidateNote(note);
+        MidiValidation.ValidateVelocity(velocity);
+        Guard.NotNegative((int)(beat * 1000), nameof(beat)); // beat must be non-negative
+
         Events.Add(new NoteEvent
         {
             Note = note,
