@@ -214,6 +214,17 @@ public interface IVstPlugin : ISynth, IDisposable
     /// Check if the plugin is currently active
     /// </summary>
     bool IsActive { get; }
+
+    /// <summary>
+    /// Gets or sets whether the plugin is bypassed.
+    /// When bypassed, the plugin passes audio through without processing.
+    /// </summary>
+    bool IsBypassed { get; set; }
+
+    /// <summary>
+    /// Event raised when the bypass state changes.
+    /// </summary>
+    event EventHandler<bool>? BypassChanged;
 }
 
 /// <summary>

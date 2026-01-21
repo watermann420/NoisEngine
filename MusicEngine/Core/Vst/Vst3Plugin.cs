@@ -125,6 +125,9 @@ public class Vst3Plugin : IVst3Plugin
     // Input provider for effect processing
     private ISampleProvider? _inputProvider;
 
+    // Bypass support
+    private bool _isBypassed;
+
     // Note Expression support
     private bool _supportsNoteExpression;
 
@@ -258,6 +261,28 @@ public class Vst3Plugin : IVst3Plugin
     /// Audio format for ISampleProvider
     /// </summary>
     public WaveFormat WaveFormat => _waveFormat;
+
+    /// <summary>
+    /// Gets or sets whether the plugin is bypassed.
+    /// When bypassed, the plugin passes audio through without processing.
+    /// </summary>
+    public bool IsBypassed
+    {
+        get => _isBypassed;
+        set
+        {
+            if (_isBypassed != value)
+            {
+                _isBypassed = value;
+                BypassChanged?.Invoke(this, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Event raised when the bypass state changes.
+    /// </summary>
+    public event EventHandler<bool>? BypassChanged;
 
     #endregion
 
@@ -1699,6 +1724,21 @@ public class Vst3Plugin : IVst3Plugin
             {
                 Array.Clear(buffer, offset, count);
                 return count;
+            }
+
+            // Handle bypass - pass through input audio or silence
+            if (_isBypassed)
+            {
+                if (_inputProvider != null)
+                {
+                    return _inputProvider.Read(buffer, offset, count);
+                }
+                else
+                {
+                    // For instruments, output silence when bypassed
+                    Array.Clear(buffer, offset, count);
+                    return count;
+                }
             }
 
             // Auto-activate if not active

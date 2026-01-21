@@ -237,6 +237,7 @@ public class VstPlugin : IVstPlugin
     private IntPtr _moduleHandle = IntPtr.Zero;
     private bool _isDisposed;
     private bool _isProcessing;
+    private bool _isBypassed;
     private float _masterVolume = 1.0f;
 
     // Audio buffers
@@ -344,6 +345,28 @@ public class VstPlugin : IVstPlugin
     public int BlockSize => Settings.VstBufferSize;
     public bool HasEditor => _pluginHandle != IntPtr.Zero && (Marshal.ReadInt32(_pluginHandle, IntPtr.Size * 5 + 16) & (int)VstPluginFlags.HasEditor) != 0;
     public bool IsActive => _isProcessing;
+
+    /// <summary>
+    /// Event raised when the bypass state changes.
+    /// </summary>
+    public event EventHandler<bool>? BypassChanged;
+
+    /// <summary>
+    /// Gets or sets whether the plugin is bypassed.
+    /// When bypassed, audio passes through without processing.
+    /// </summary>
+    public bool IsBypassed
+    {
+        get => _isBypassed;
+        set
+        {
+            if (_isBypassed != value)
+            {
+                _isBypassed = value;
+                BypassChanged?.Invoke(this, value);
+            }
+        }
+    }
 
     /// <summary>
     /// Gets or sets the input provider for effect processing.
@@ -1511,9 +1534,20 @@ public class VstPlugin : IVstPlugin
                     // Process automation
                     ProcessAutomation();
 
-                    // Process through VST plugin
-                    if (_processReplacing != null && _pluginHandle != IntPtr.Zero)
+                    // Handle bypass - pass input through without processing
+                    if (_isBypassed)
                     {
+                        // For effects, pass input through; for instruments, output silence
+                        if (!IsInstrument && _inputProvider != null)
+                        {
+                            Array.Copy(_inputBufferLeft, _outputBufferLeft, samplesToProcess);
+                            Array.Copy(_inputBufferRight, _outputBufferRight, samplesToProcess);
+                        }
+                        // else output buffers are already cleared (silence for bypassed instruments)
+                    }
+                    else if (_processReplacing != null && _pluginHandle != IntPtr.Zero)
+                    {
+                        // Process through VST plugin
                         // Pin pointer arrays
                         GCHandle inputPtrsHandle = GCHandle.Alloc(_inputPointers, GCHandleType.Pinned);
                         GCHandle outputPtrsHandle = GCHandle.Alloc(_outputPointers, GCHandleType.Pinned);
@@ -1579,9 +1613,20 @@ public class VstPlugin : IVstPlugin
                 // Process automation
                 ProcessAutomation();
 
-                // Process through VST
-                if (_processReplacing != null && _pluginHandle != IntPtr.Zero)
+                // Handle bypass - pass input through without processing
+                if (_isBypassed)
                 {
+                    // For effects, pass input through; for instruments, output silence
+                    if (!IsInstrument)
+                    {
+                        Array.Copy(_inputBufferLeft, _outputBufferLeft, samplesPerChannel);
+                        Array.Copy(_inputBufferRight, _outputBufferRight, samplesPerChannel);
+                    }
+                    // else output buffers are already cleared (silence for bypassed instruments)
+                }
+                else if (_processReplacing != null && _pluginHandle != IntPtr.Zero)
+                {
+                    // Process through VST
                     GCHandle inputPtrsHandle = GCHandle.Alloc(_inputPointers, GCHandleType.Pinned);
                     GCHandle outputPtrsHandle = GCHandle.Alloc(_outputPointers, GCHandleType.Pinned);
 
