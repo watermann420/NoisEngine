@@ -1,7 +1,7 @@
 //Engine License (MEL) - Honor-Based Commercial Support
 // copyright (c) 2026 MusicEngine Watermann420 and Contributors
 // Created by Watermann420
-// Description: VST Plugin Host for loading, managing, and processing VST plugins with MIDI support.
+// Description: VST Plugin Host for loading, managing, and processing VST2 and VST3 plugins with MIDI support.
 
 
 using System;
@@ -11,6 +11,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using MusicEngine.Core.Vst.Vst3.Interfaces;
+using MusicEngine.Core.Vst.Vst3.Structures;
 using NAudio.Wave;
 
 
@@ -20,25 +22,44 @@ namespace MusicEngine.Core;
 /// <summary>
 /// Central VST Host that manages plugin discovery, loading, and lifecycle.
 /// Provides utilities for preset management and parameter discovery across plugins.
+/// Supports both VST2 and VST3 plugin formats.
 /// </summary>
 public class VstHost : IDisposable
 {
     private readonly List<VstPluginInfo> _discoveredPlugins = new();
-    private readonly Dictionary<string, VstPlugin> _loadedPlugins = new();
+    private readonly List<Vst3PluginInfo> _discoveredVst3Plugins = new();
+    private readonly Dictionary<string, IVstPlugin> _loadedPlugins = new();
     private readonly object _lock = new();
     private bool _isDisposed;
 
+    // P/Invoke for VST3 plugin loading
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr LoadLibraryW(string lpFileName);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool FreeLibrary(IntPtr hModule);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Ansi)]
+    private static extern IntPtr GetProcAddress(IntPtr hModule, string lpProcName);
+
+    // VST3 entry point delegate
+    [UnmanagedFunctionPointer(CallingConvention.StdCall)]
+    private delegate IntPtr GetPluginFactoryDelegate();
+
     public IReadOnlyList<VstPluginInfo> DiscoveredPlugins => _discoveredPlugins.AsReadOnly();
-    public IReadOnlyDictionary<string, VstPlugin> LoadedPlugins => _loadedPlugins;
+    public IReadOnlyList<Vst3PluginInfo> DiscoveredVst3Plugins => _discoveredVst3Plugins.AsReadOnly();
+    public IReadOnlyDictionary<string, IVstPlugin> LoadedPlugins => _loadedPlugins;
 
     /// <summary>
-    /// Scan for VST plugins in configured paths and return discovered plugins
+    /// Scan for VST plugins in configured paths and return discovered plugins.
+    /// Scans for both VST2 (.dll) and VST3 (.vst3 files and bundles) plugins.
     /// </summary>
     public List<VstPluginInfo> ScanForPlugins()
     {
         lock (_lock)
         {
             _discoveredPlugins.Clear();
+            _discoveredVst3Plugins.Clear();
 
             var searchPaths = new List<string>(Settings.VstPluginSearchPaths);
 
@@ -64,23 +85,30 @@ public class VstHost : IDisposable
                         }
                     }
 
-                    // Scan for VST3 plugins (.vst3)
+                    // Scan for VST3 single-file plugins (.vst3 files)
                     foreach (var file in Directory.GetFiles(basePath, "*.vst3", SearchOption.AllDirectories))
                     {
-                        var pluginInfo = ProbePlugin(file, true);
+                        // Skip files inside bundle directories (we'll handle bundles separately)
+                        var parentDir = Path.GetDirectoryName(file);
+                        if (parentDir != null && (parentDir.EndsWith("x86_64-win") || parentDir.EndsWith("Win64")))
+                        {
+                            continue;
+                        }
+
+                        var pluginInfo = ProbeVst3Plugin(file);
                         if (pluginInfo != null)
                         {
-                            _discoveredPlugins.Add(pluginInfo);
+                            _discoveredVst3Plugins.Add(pluginInfo);
                         }
                     }
 
-                    // VST3 bundles (folders)
+                    // Scan for VST3 bundle directories (*.vst3 folders)
                     foreach (var dir in Directory.GetDirectories(basePath, "*.vst3", SearchOption.AllDirectories))
                     {
-                        var pluginInfo = ProbeVst3Bundle(dir);
+                        var pluginInfo = ScanVst3Bundle(dir);
                         if (pluginInfo != null)
                         {
-                            _discoveredPlugins.Add(pluginInfo);
+                            _discoveredVst3Plugins.Add(pluginInfo);
                         }
                     }
                 }
@@ -91,6 +119,20 @@ public class VstHost : IDisposable
             }
 
             return new List<VstPluginInfo>(_discoveredPlugins);
+        }
+    }
+
+    /// <summary>
+    /// Get all discovered plugins (both VST2 and VST3) as a combined list.
+    /// </summary>
+    public List<object> GetAllDiscoveredPlugins()
+    {
+        lock (_lock)
+        {
+            var result = new List<object>();
+            result.AddRange(_discoveredPlugins);
+            result.AddRange(_discoveredVst3Plugins);
+            return result;
         }
     }
 
@@ -133,49 +175,269 @@ public class VstHost : IDisposable
     }
 
     /// <summary>
-    /// Probe a VST3 bundle directory
+    /// Scan a VST3 bundle directory and probe the plugin inside.
     /// </summary>
-    private VstPluginInfo? ProbeVst3Bundle(string bundlePath)
+    private Vst3PluginInfo? ScanVst3Bundle(string bundlePath)
     {
         try
         {
             if (!Directory.Exists(bundlePath)) return null;
 
-            var name = Path.GetFileNameWithoutExtension(bundlePath);
-
-            // Look for the actual plugin binary inside the bundle
-            var contentsPath = Path.Combine(bundlePath, "Contents", "x86_64-win");
-            if (!Directory.Exists(contentsPath))
+            var resolvedPath = ResolveBundlePath(bundlePath);
+            if (resolvedPath == null || !File.Exists(resolvedPath))
             {
-                contentsPath = Path.Combine(bundlePath, "Contents", "Win64");
+                // No valid binary found, create basic info
+                var name = Path.GetFileNameWithoutExtension(bundlePath);
+                return new Vst3PluginInfo
+                {
+                    Name = name,
+                    Path = bundlePath,
+                    ResolvedPath = "",
+                    Vendor = "Unknown",
+                    Version = "1.0",
+                    IsInstrument = GuessIsInstrument(name),
+                    IsBundle = true,
+                    NumInputs = 2,
+                    NumOutputs = 2
+                };
             }
 
-            string? pluginBinary = null;
+            // Probe the resolved plugin file
+            var info = ProbeVst3Plugin(resolvedPath);
+            if (info != null)
+            {
+                info.Path = bundlePath;
+                info.ResolvedPath = resolvedPath;
+                info.IsBundle = true;
+            }
+            return info;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error scanning VST3 bundle '{bundlePath}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Resolve a VST3 bundle path to the actual DLL inside.
+    /// For bundles, looks in Contents/x86_64-win/*.vst3 or Contents/Win64/*.vst3
+    /// </summary>
+    /// <param name="path">Path to the .vst3 file or bundle directory</param>
+    /// <returns>Resolved path to the actual DLL, or null if not found</returns>
+    public string? ResolveBundlePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return null;
+
+        // If it's a file, return as-is
+        if (File.Exists(path))
+        {
+            return path;
+        }
+
+        // If it's a directory (bundle), look for the actual DLL inside
+        if (Directory.Exists(path))
+        {
+            // Try x86_64-win first (64-bit Windows standard)
+            var contentsPath = Path.Combine(path, "Contents", "x86_64-win");
             if (Directory.Exists(contentsPath))
             {
                 var dlls = Directory.GetFiles(contentsPath, "*.vst3");
-                if (dlls.Length > 0) pluginBinary = dlls[0];
+                if (dlls.Length > 0) return dlls[0];
             }
 
-            return new VstPluginInfo
+            // Try Win64 (alternative folder name)
+            contentsPath = Path.Combine(path, "Contents", "Win64");
+            if (Directory.Exists(contentsPath))
             {
-                Name = name,
-                Path = pluginBinary ?? bundlePath,
-                Vendor = "Unknown",
-                Version = "1.0",
-                UniqueId = bundlePath.GetHashCode(),
-                IsInstrument = GuessIsInstrument(name),
-                IsLoaded = false,
-                NumInputs = 2,
-                NumOutputs = 2,
-                NumParameters = 0,
-                NumPrograms = 1
-            };
+                var dlls = Directory.GetFiles(contentsPath, "*.vst3");
+                if (dlls.Length > 0) return dlls[0];
+            }
+
+            // Try i386-win (32-bit Windows)
+            contentsPath = Path.Combine(path, "Contents", "i386-win");
+            if (Directory.Exists(contentsPath))
+            {
+                var dlls = Directory.GetFiles(contentsPath, "*.vst3");
+                if (dlls.Length > 0) return dlls[0];
+            }
+
+            // Try Win32 (alternative 32-bit folder name)
+            contentsPath = Path.Combine(path, "Contents", "Win32");
+            if (Directory.Exists(contentsPath))
+            {
+                var dlls = Directory.GetFiles(contentsPath, "*.vst3");
+                if (dlls.Length > 0) return dlls[0];
+            }
         }
-        catch
+
+        return null;
+    }
+
+    /// <summary>
+    /// Probe a VST3 plugin file to get its info.
+    /// Loads the factory temporarily, reads class info, and unloads without full initialization.
+    /// </summary>
+    /// <param name="path">Path to the VST3 plugin file</param>
+    /// <returns>VST3 plugin info or null if probing failed</returns>
+    public Vst3PluginInfo? ProbeVst3Plugin(string path)
+    {
+        IntPtr moduleHandle = IntPtr.Zero;
+        PluginFactoryWrapper? factory = null;
+
+        try
         {
-            return null;
+            // Basic validation
+            if (!File.Exists(path)) return null;
+
+            var fileInfo = new FileInfo(path);
+            if (fileInfo.Length < 1024) return null; // Too small to be a VST3
+
+            // Load the DLL
+            moduleHandle = LoadLibraryW(path);
+            if (moduleHandle == IntPtr.Zero)
+            {
+                return CreateBasicVst3Info(path);
+            }
+
+            // Get the factory entry point
+            IntPtr getFactoryProc = GetProcAddress(moduleHandle, "GetPluginFactory");
+            if (getFactoryProc == IntPtr.Zero)
+            {
+                FreeLibrary(moduleHandle);
+                return CreateBasicVst3Info(path);
+            }
+
+            // Call GetPluginFactory
+            var getFactory = Marshal.GetDelegateForFunctionPointer<GetPluginFactoryDelegate>(getFactoryProc);
+            IntPtr factoryPtr = getFactory();
+            if (factoryPtr == IntPtr.Zero)
+            {
+                FreeLibrary(moduleHandle);
+                return CreateBasicVst3Info(path);
+            }
+
+            // Wrap the factory
+            factory = new PluginFactoryWrapper(factoryPtr);
+
+            // Get factory info (vendor, url, email)
+            string vendor = "Unknown";
+            if (factory.GetFactoryInfo(out Vst3FactoryInfo factoryInfo) == (int)Vst3Result.Ok)
+            {
+                vendor = factoryInfo.Vendor ?? "Unknown";
+            }
+
+            // Get class count
+            int classCount = factory.CountClasses();
+            if (classCount <= 0)
+            {
+                factory.Dispose();
+                FreeLibrary(moduleHandle);
+                return CreateBasicVst3Info(path);
+            }
+
+            // Find the first audio processor class
+            Vst3PluginInfo? result = null;
+
+            for (int i = 0; i < classCount; i++)
+            {
+                // Try to get ClassInfo2 first (has more info)
+                if (factory.IsFactory2 && factory.GetClassInfo2(i, out Vst3ClassInfo2 classInfo2) == (int)Vst3Result.Ok)
+                {
+                    // Check if this is an audio processor (kVstAudioEffectClass)
+                    if (classInfo2.Category == "Audio Module Class" ||
+                        classInfo2.Category?.Contains("Audio", StringComparison.OrdinalIgnoreCase) == true ||
+                        string.IsNullOrEmpty(classInfo2.Category))
+                    {
+                        result = new Vst3PluginInfo
+                        {
+                            Name = classInfo2.Name ?? Path.GetFileNameWithoutExtension(path),
+                            Path = path,
+                            ResolvedPath = path,
+                            Vendor = !string.IsNullOrEmpty(classInfo2.Vendor) ? classInfo2.Vendor : vendor,
+                            Version = classInfo2.Version ?? "1.0",
+                            SdkVersion = classInfo2.SdkVersion ?? "",
+                            ClassId = classInfo2.Cid.ToGuid(),
+                            Category = classInfo2.Category ?? "",
+                            SubCategories = classInfo2.SubCategories ?? "",
+                            ClassFlags = classInfo2.ClassFlags,
+                            IsInstrument = Vst3PluginInfo.DetermineIsInstrument(classInfo2.Category, classInfo2.SubCategories),
+                            IsBundle = false,
+                            NumInputs = 2,
+                            NumOutputs = 2
+                        };
+                        break;
+                    }
+                }
+                else if (factory.GetClassInfo(i, out Vst3ClassInfo classInfo) == (int)Vst3Result.Ok)
+                {
+                    // Basic ClassInfo (version 1)
+                    if (classInfo.Category == "Audio Module Class" ||
+                        classInfo.Category?.Contains("Audio", StringComparison.OrdinalIgnoreCase) == true ||
+                        string.IsNullOrEmpty(classInfo.Category))
+                    {
+                        result = new Vst3PluginInfo
+                        {
+                            Name = classInfo.Name ?? Path.GetFileNameWithoutExtension(path),
+                            Path = path,
+                            ResolvedPath = path,
+                            Vendor = vendor,
+                            Version = "1.0",
+                            ClassId = classInfo.Cid.ToGuid(),
+                            Category = classInfo.Category ?? "",
+                            IsInstrument = GuessIsInstrument(classInfo.Name ?? ""),
+                            IsBundle = false,
+                            NumInputs = 2,
+                            NumOutputs = 2
+                        };
+                        break;
+                    }
+                }
+            }
+
+            // Cleanup
+            factory.Dispose();
+            FreeLibrary(moduleHandle);
+
+            return result ?? CreateBasicVst3Info(path);
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Warning: Error probing VST3 plugin '{path}': {ex.Message}");
+
+            // Cleanup on error
+            try
+            {
+                factory?.Dispose();
+                if (moduleHandle != IntPtr.Zero)
+                {
+                    FreeLibrary(moduleHandle);
+                }
+            }
+            catch { }
+
+            return CreateBasicVst3Info(path);
+        }
+    }
+
+    /// <summary>
+    /// Create basic VST3 plugin info from filename when probing fails.
+    /// </summary>
+    private Vst3PluginInfo CreateBasicVst3Info(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        return new Vst3PluginInfo
+        {
+            Name = name,
+            Path = path,
+            ResolvedPath = path,
+            Vendor = "Unknown",
+            Version = "1.0",
+            IsInstrument = GuessIsInstrument(name),
+            IsBundle = false,
+            NumInputs = 2,
+            NumOutputs = 2
+        };
     }
 
     /// <summary>
@@ -193,9 +455,10 @@ public class VstHost : IDisposable
     }
 
     /// <summary>
-    /// Load a VST plugin by name (partial match supported)
+    /// Load a VST plugin by name (partial match supported).
+    /// Returns IVstPlugin interface which works for both VST2 and VST3.
     /// </summary>
-    public VstPlugin? LoadPlugin(string nameOrPath)
+    public IVstPlugin? LoadPlugin(string nameOrPath)
     {
         lock (_lock)
         {
@@ -205,72 +468,219 @@ public class VstHost : IDisposable
                 return existing;
             }
 
-            // Find the plugin
-            VstPluginInfo? info = null;
+            // First check if it's a VST3 plugin
+            bool isVst3 = nameOrPath.EndsWith(".vst3", StringComparison.OrdinalIgnoreCase) ||
+                          (Directory.Exists(nameOrPath) && nameOrPath.EndsWith(".vst3", StringComparison.OrdinalIgnoreCase));
 
-            // First try exact path match
-            if (File.Exists(nameOrPath))
+            // If explicit path provided
+            if (File.Exists(nameOrPath) || Directory.Exists(nameOrPath))
             {
-                info = _discoveredPlugins.Find(p => p.Path.Equals(nameOrPath, StringComparison.OrdinalIgnoreCase));
-                if (info == null)
+                if (isVst3)
                 {
-                    // Not in discovered list, probe it
-                    info = ProbePlugin(nameOrPath, nameOrPath.EndsWith(".vst3"));
-                    if (info != null) _discoveredPlugins.Add(info);
+                    return LoadVst3PluginByPath(nameOrPath);
+                }
+                else
+                {
+                    return LoadVst2PluginByPath(nameOrPath);
                 }
             }
 
-            // Then try name match
-            if (info == null)
+            // Try to find in discovered VST3 plugins first
+            var vst3Info = _discoveredVst3Plugins.Find(p =>
+                p.Name.Equals(nameOrPath, StringComparison.OrdinalIgnoreCase) ||
+                p.Name.Contains(nameOrPath, StringComparison.OrdinalIgnoreCase));
+
+            if (vst3Info != null)
             {
-                info = _discoveredPlugins.Find(p =>
-                    p.Name.Equals(nameOrPath, StringComparison.OrdinalIgnoreCase) ||
-                    p.Name.Contains(nameOrPath, StringComparison.OrdinalIgnoreCase));
+                return LoadVst3Plugin(vst3Info);
             }
 
-            if (info == null)
+            // Try to find in discovered VST2 plugins
+            var vst2Info = _discoveredPlugins.Find(p =>
+                p.Name.Equals(nameOrPath, StringComparison.OrdinalIgnoreCase) ||
+                p.Name.Contains(nameOrPath, StringComparison.OrdinalIgnoreCase));
+
+            if (vst2Info != null)
             {
-                Console.WriteLine($"VST Plugin not found: {nameOrPath}");
-                return null;
+                return LoadVst2Plugin(vst2Info);
             }
 
-            try
-            {
-                var plugin = new VstPlugin(info);
-                info.IsLoaded = true;
-                _loadedPlugins[info.Name] = plugin;
-                Console.WriteLine($"Loaded VST Plugin: {info.Name} ({(info.IsInstrument ? "Instrument" : "Effect")})");
-                return plugin;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to load VST Plugin '{info.Name}': {ex.Message}");
-                return null;
-            }
+            Console.WriteLine($"VST Plugin not found: {nameOrPath}");
+            return null;
         }
     }
 
     /// <summary>
-    /// Load a VST plugin by index from the discovered list
+    /// Load a VST2 plugin by path.
     /// </summary>
-    public VstPlugin? LoadPluginByIndex(int index)
+    private IVstPlugin? LoadVst2PluginByPath(string path)
+    {
+        var info = _discoveredPlugins.Find(p => p.Path.Equals(path, StringComparison.OrdinalIgnoreCase));
+        if (info == null)
+        {
+            // Not in discovered list, probe it
+            info = ProbePlugin(path, false);
+            if (info != null) _discoveredPlugins.Add(info);
+        }
+
+        return info != null ? LoadVst2Plugin(info) : null;
+    }
+
+    /// <summary>
+    /// Load a VST3 plugin by path.
+    /// </summary>
+    private IVstPlugin? LoadVst3PluginByPath(string path)
+    {
+        var info = _discoveredVst3Plugins.Find(p =>
+            p.Path.Equals(path, StringComparison.OrdinalIgnoreCase) ||
+            p.ResolvedPath.Equals(path, StringComparison.OrdinalIgnoreCase));
+
+        if (info == null)
+        {
+            // Not in discovered list, probe it
+            if (Directory.Exists(path))
+            {
+                info = ScanVst3Bundle(path);
+            }
+            else
+            {
+                info = ProbeVst3Plugin(path);
+            }
+
+            if (info != null) _discoveredVst3Plugins.Add(info);
+        }
+
+        return info != null ? LoadVst3Plugin(info) : null;
+    }
+
+    /// <summary>
+    /// Load a VST2 plugin from its info.
+    /// </summary>
+    private IVstPlugin? LoadVst2Plugin(VstPluginInfo info)
+    {
+        try
+        {
+            // Check if already loaded
+            if (_loadedPlugins.TryGetValue(info.Name, out var existing))
+            {
+                return existing;
+            }
+
+            var plugin = new VstPlugin(info);
+            info.IsLoaded = true;
+            _loadedPlugins[info.Name] = plugin;
+            Console.WriteLine($"Loaded VST2 Plugin: {info.Name} ({(info.IsInstrument ? "Instrument" : "Effect")})");
+            return plugin;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load VST2 Plugin '{info.Name}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Load a VST3 plugin from its info.
+    /// Note: Full VST3 plugin wrapper implementation requires Vst3Plugin class.
+    /// This method creates a VstPlugin wrapper for basic compatibility.
+    /// </summary>
+    private IVstPlugin? LoadVst3Plugin(Vst3PluginInfo info)
+    {
+        try
+        {
+            // Check if already loaded
+            if (_loadedPlugins.TryGetValue(info.Name, out var existing))
+            {
+                return existing;
+            }
+
+            // Resolve the actual plugin path for bundles
+            string pluginPath = info.IsBundle && !string.IsNullOrEmpty(info.ResolvedPath)
+                ? info.ResolvedPath
+                : info.Path;
+
+            // Create a VstPluginInfo wrapper to use with VstPlugin
+            // This provides basic compatibility until full Vst3Plugin is implemented
+            var compatInfo = new VstPluginInfo
+            {
+                Name = info.Name,
+                Path = pluginPath,
+                Vendor = info.Vendor,
+                Version = info.Version,
+                UniqueId = info.ClassId.GetHashCode(),
+                IsInstrument = info.IsInstrument,
+                IsLoaded = false,
+                NumInputs = info.NumInputs,
+                NumOutputs = info.NumOutputs,
+                NumParameters = info.NumParameters
+            };
+
+            // TODO: When full Vst3Plugin class is implemented, use:
+            // var plugin = new Vst3Plugin(info);
+
+            // For now, create a VstPlugin wrapper (works for many VST3 plugins)
+            // Note: Some VST3-specific features won't be available
+            var plugin = new VstPlugin(compatInfo);
+            info.IsLoaded = true;
+            _loadedPlugins[info.Name] = plugin;
+            Console.WriteLine($"Loaded VST3 Plugin: {info.Name} ({(info.IsInstrument ? "Instrument" : "Effect")})");
+            return plugin;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to load VST3 Plugin '{info.Name}': {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Load a VST plugin by name, returning VstPlugin for backwards compatibility.
+    /// For new code, prefer using LoadPlugin which returns IVstPlugin.
+    /// </summary>
+    public VstPlugin? LoadVst2Plugin(string nameOrPath)
+    {
+        var plugin = LoadPlugin(nameOrPath);
+        return plugin as VstPlugin;
+    }
+
+    /// <summary>
+    /// Load a VST2 plugin by index from the discovered VST2 list.
+    /// </summary>
+    public IVstPlugin? LoadPluginByIndex(int index)
     {
         lock (_lock)
         {
             if (index < 0 || index >= _discoveredPlugins.Count)
             {
-                Console.WriteLine($"Invalid VST plugin index: {index}");
+                Console.WriteLine($"Invalid VST2 plugin index: {index}");
                 return null;
             }
 
-            return LoadPlugin(_discoveredPlugins[index].Name);
+            return LoadVst2Plugin(_discoveredPlugins[index]);
         }
     }
 
     /// <summary>
-    /// Get a loaded plugin by name
+    /// Load a VST3 plugin by index from the discovered VST3 list.
     /// </summary>
-    public VstPlugin? GetPlugin(string name)
+    public IVstPlugin? LoadVst3PluginByIndex(int index)
+    {
+        lock (_lock)
+        {
+            if (index < 0 || index >= _discoveredVst3Plugins.Count)
+            {
+                Console.WriteLine($"Invalid VST3 plugin index: {index}");
+                return null;
+            }
+
+            return LoadVst3Plugin(_discoveredVst3Plugins[index]);
+        }
+    }
+
+    /// <summary>
+    /// Get a loaded plugin by name (returns IVstPlugin interface).
+    /// </summary>
+    public IVstPlugin? GetPlugin(string name)
     {
         lock (_lock)
         {
@@ -293,7 +703,15 @@ public class VstHost : IDisposable
     }
 
     /// <summary>
-    /// Unload a VST plugin
+    /// Get a loaded VST2 plugin by name (for backwards compatibility).
+    /// </summary>
+    public VstPlugin? GetVstPlugin(string name)
+    {
+        return GetPlugin(name) as VstPlugin;
+    }
+
+    /// <summary>
+    /// Unload a VST plugin.
     /// </summary>
     public void UnloadPlugin(string name)
     {
@@ -304,8 +722,13 @@ public class VstHost : IDisposable
                 plugin.Dispose();
                 _loadedPlugins.Remove(name);
 
-                var info = _discoveredPlugins.Find(p => p.Name == name);
-                if (info != null) info.IsLoaded = false;
+                // Update VST2 discovered list
+                var vst2Info = _discoveredPlugins.Find(p => p.Name == name);
+                if (vst2Info != null) vst2Info.IsLoaded = false;
+
+                // Update VST3 discovered list
+                var vst3Info = _discoveredVst3Plugins.Find(p => p.Name == name);
+                if (vst3Info != null) vst3Info.IsLoaded = false;
 
                 Console.WriteLine($"Unloaded VST Plugin: {name}");
             }
@@ -313,19 +736,14 @@ public class VstHost : IDisposable
     }
 
     /// <summary>
-    /// Print all discovered plugins to console
+    /// Print all discovered plugins to console.
     /// </summary>
     public void PrintDiscoveredPlugins()
     {
-        Console.WriteLine("\n=== Discovered VST Plugins ===");
+        Console.WriteLine("\n=== Discovered VST2 Plugins ===");
         if (_discoveredPlugins.Count == 0)
         {
-            Console.WriteLine("  No VST plugins found.");
-            Console.WriteLine("  Search paths:");
-            foreach (var path in Settings.VstPluginSearchPaths)
-            {
-                Console.WriteLine($"    - {path}");
-            }
+            Console.WriteLine("  No VST2 plugins found.");
         }
         else
         {
@@ -338,11 +756,48 @@ public class VstHost : IDisposable
                 Console.WriteLine($"      Path: {p.Path}");
             }
         }
-        Console.WriteLine("==============================\n");
+        Console.WriteLine("===============================\n");
+
+        Console.WriteLine("=== Discovered VST3 Plugins ===");
+        if (_discoveredVst3Plugins.Count == 0)
+        {
+            Console.WriteLine("  No VST3 plugins found.");
+        }
+        else
+        {
+            for (int i = 0; i < _discoveredVst3Plugins.Count; i++)
+            {
+                var p = _discoveredVst3Plugins[i];
+                var type = p.IsInstrument ? "VSTi" : "VST";
+                var loaded = p.IsLoaded ? " [LOADED]" : "";
+                var bundle = p.IsBundle ? " [BUNDLE]" : "";
+                Console.WriteLine($"  [{i}] {p.Name} (VST3 {type}){loaded}{bundle}");
+                Console.WriteLine($"      Vendor: {p.Vendor}");
+                Console.WriteLine($"      Path: {p.Path}");
+                if (p.IsBundle && !string.IsNullOrEmpty(p.ResolvedPath))
+                {
+                    Console.WriteLine($"      Binary: {p.ResolvedPath}");
+                }
+                if (!string.IsNullOrEmpty(p.SubCategories))
+                {
+                    Console.WriteLine($"      Categories: {p.SubCategories}");
+                }
+            }
+        }
+
+        if (_discoveredPlugins.Count == 0 && _discoveredVst3Plugins.Count == 0)
+        {
+            Console.WriteLine("  Search paths:");
+            foreach (var path in Settings.VstPluginSearchPaths)
+            {
+                Console.WriteLine($"    - {path}");
+            }
+        }
+        Console.WriteLine("===============================\n");
     }
 
     /// <summary>
-    /// Print all loaded plugins to console
+    /// Print all loaded plugins to console.
     /// </summary>
     public void PrintLoadedPlugins()
     {
@@ -357,7 +812,8 @@ public class VstHost : IDisposable
             {
                 var p = kvp.Value;
                 var type = p.IsInstrument ? "VSTi" : "VST";
-                Console.WriteLine($"  - {p.Name} ({type})");
+                var format = p.IsVst3 ? "VST3" : "VST2";
+                Console.WriteLine($"  - {p.Name} ({format} {type})");
             }
         }
         Console.WriteLine("==========================\n");
@@ -783,6 +1239,7 @@ public class VstHost : IDisposable
             }
             _loadedPlugins.Clear();
             _discoveredPlugins.Clear();
+            _discoveredVst3Plugins.Clear();
         }
 
         GC.SuppressFinalize(this);

@@ -489,8 +489,8 @@ public class AudioEngine : IDisposable
         return _vstHost.ScanForPlugins();
     }
 
-    // Load a VST plugin by name
-    public VstPlugin? LoadVstPlugin(string nameOrPath)
+    // Load a VST plugin by name (returns IVstPlugin to support both VST2 and VST3)
+    public IVstPlugin? LoadVstPlugin(string nameOrPath)
     {
         var plugin = _vstHost.LoadPlugin(nameOrPath);
         if (plugin != null)
@@ -500,8 +500,8 @@ public class AudioEngine : IDisposable
         return plugin;
     }
 
-    // Load a VST plugin by index
-    public VstPlugin? LoadVstPluginByIndex(int index)
+    // Load a VST plugin by index (returns IVstPlugin to support both VST2 and VST3)
+    public IVstPlugin? LoadVstPluginByIndex(int index)
     {
         var plugin = _vstHost.LoadPluginByIndex(index);
         if (plugin != null)
@@ -511,8 +511,8 @@ public class AudioEngine : IDisposable
         return plugin;
     }
 
-    // Get a loaded VST plugin
-    public VstPlugin? GetVstPlugin(string name)
+    // Get a loaded VST plugin (returns IVstPlugin to support both VST2 and VST3)
+    public IVstPlugin? GetVstPlugin(string name)
     {
         return _vstHost.GetPlugin(name);
     }

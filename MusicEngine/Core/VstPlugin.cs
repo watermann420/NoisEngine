@@ -215,7 +215,7 @@ internal struct FxpHeader
 /// VST Plugin wrapper that implements ISynth for seamless integration.
 /// Provides full DSP processing, preset management, and parameter automation.
 /// </summary>
-public class VstPlugin : ISynth, IDisposable
+public class VstPlugin : IVstPlugin
 {
     // VST SDK constants
     private const int kVstMidiType = 1;
@@ -330,6 +330,18 @@ public class VstPlugin : ISynth, IDisposable
     public string CurrentPresetName => _currentPresetName;
     public int CurrentPresetIndex => _currentPreset;
     public float MasterVolume { get => _masterVolume; set => _masterVolume = Math.Clamp(value, 0f, 2f); }
+
+    // IVstPlugin interface properties
+    public string PluginPath => _info.Path;
+    public string Vendor => _info.Vendor;
+    public string Version => _info.Version;
+    public bool IsVst3 => false; // Always false for VST2
+    public int NumAudioInputs => _info.NumInputs;
+    public int NumAudioOutputs => _info.NumOutputs;
+    public int SampleRate => _waveFormat.SampleRate;
+    public int BlockSize => Settings.VstBufferSize;
+    public bool HasEditor => _pluginHandle != IntPtr.Zero && (Marshal.ReadInt32(_pluginHandle, IntPtr.Size * 5 + 16) & (int)VstPluginFlags.HasEditor) != 0;
+    public bool IsActive => _isProcessing;
 
     /// <summary>
     /// Gets or sets the input provider for effect processing.
@@ -1640,6 +1652,143 @@ public class VstPlugin : ISynth, IDisposable
                 {
                     output[dstIndex + 1] = right[i] * gain;
                 }
+            }
+        }
+    }
+
+    #endregion
+
+    #region IVstPlugin Interface Methods
+
+    /// <summary>
+    /// Set the sample rate for processing
+    /// </summary>
+    public void SetSampleRate(double sampleRate)
+    {
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero)
+            {
+                _dispatcher(_pluginHandle, (int)VstOpcode.SetSampleRate, 0, IntPtr.Zero, IntPtr.Zero, (float)sampleRate);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Set the block size for processing
+    /// </summary>
+    public void SetBlockSize(int blockSize)
+    {
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero)
+            {
+                _dispatcher(_pluginHandle, (int)VstOpcode.SetBlockSize, 0, new IntPtr(blockSize), IntPtr.Zero, 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Open the plugin editor GUI
+    /// </summary>
+    /// <param name="parentWindow">Handle to the parent window</param>
+    /// <returns>Handle to the editor window, or IntPtr.Zero if failed</returns>
+    public IntPtr OpenEditor(IntPtr parentWindow)
+    {
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero && HasEditor)
+            {
+                return _dispatcher(_pluginHandle, (int)VstOpcode.EditOpen, 0, IntPtr.Zero, parentWindow, 0);
+            }
+        }
+        return IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Close the plugin editor GUI
+    /// </summary>
+    public void CloseEditor()
+    {
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero)
+            {
+                _dispatcher(_pluginHandle, (int)VstOpcode.EditClose, 0, IntPtr.Zero, IntPtr.Zero, 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Get the preferred editor window size
+    /// </summary>
+    /// <param name="width">Output width</param>
+    /// <param name="height">Output height</param>
+    /// <returns>True if size was retrieved</returns>
+    public bool GetEditorSize(out int width, out int height)
+    {
+        width = 0;
+        height = 0;
+
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero && HasEditor)
+            {
+                // Allocate memory for ERect pointer
+                IntPtr rectPtrPtr = Marshal.AllocHGlobal(IntPtr.Size);
+                try
+                {
+                    Marshal.WriteIntPtr(rectPtrPtr, IntPtr.Zero);
+                    _dispatcher(_pluginHandle, (int)VstOpcode.EditGetRect, 0, IntPtr.Zero, rectPtrPtr, 0);
+
+                    IntPtr rectPtr = Marshal.ReadIntPtr(rectPtrPtr);
+                    if (rectPtr != IntPtr.Zero)
+                    {
+                        // ERect structure: short top, short left, short bottom, short right
+                        short top = Marshal.ReadInt16(rectPtr, 0);
+                        short left = Marshal.ReadInt16(rectPtr, 2);
+                        short bottom = Marshal.ReadInt16(rectPtr, 4);
+                        short right = Marshal.ReadInt16(rectPtr, 6);
+
+                        width = right - left;
+                        height = bottom - top;
+                        return true;
+                    }
+                }
+                finally
+                {
+                    Marshal.FreeHGlobal(rectPtrPtr);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Activate the plugin for processing
+    /// </summary>
+    public void Activate()
+    {
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero)
+            {
+                _dispatcher(_pluginHandle, (int)VstOpcode.MainsChanged, 0, new IntPtr(1), IntPtr.Zero, 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deactivate the plugin
+    /// </summary>
+    public void Deactivate()
+    {
+        lock (_lock)
+        {
+            if (_dispatcher != null && _pluginHandle != IntPtr.Zero)
+            {
+                _dispatcher(_pluginHandle, (int)VstOpcode.MainsChanged, 0, IntPtr.Zero, IntPtr.Zero, 0);
             }
         }
     }

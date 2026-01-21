@@ -254,20 +254,20 @@ public class ScriptGlobals
 
     // === VST Plugin Methods ===
 
-    // Load a VST plugin by name
-    public VstPlugin? LoadVst(string nameOrPath)
+    // Load a VST plugin by name (returns IVstPlugin to support both VST2 and VST3)
+    public IVstPlugin? LoadVst(string nameOrPath)
     {
         return Engine.LoadVstPlugin(nameOrPath);
     }
 
-    // Load a VST plugin by index
-    public VstPlugin? LoadVstByIndex(int index)
+    // Load a VST plugin by index (returns IVstPlugin to support both VST2 and VST3)
+    public IVstPlugin? LoadVstByIndex(int index)
     {
         return Engine.LoadVstPluginByIndex(index);
     }
 
-    // Get a loaded VST plugin
-    public VstPlugin? GetVst(string name)
+    // Get a loaded VST plugin (returns IVstPlugin to support both VST2 and VST3)
+    public IVstPlugin? GetVst(string name)
     {
         return Engine.GetVstPlugin(name);
     }
