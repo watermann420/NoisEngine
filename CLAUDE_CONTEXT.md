@@ -74,15 +74,20 @@ MusicEngine/
 ```
 MusicEngineEditor/
 ├── Views/
-│   └── MixerView.xaml/.cs      # Mixer Panel
+│   ├── MixerView.xaml/.cs      # Mixer Panel
+│   └── PianoRollView.xaml/.cs  # Piano Roll Editor
 ├── ViewModels/
-│   └── MixerViewModel.cs       # Mixer ViewModel
+│   ├── MixerViewModel.cs       # Mixer ViewModel
+│   └── PianoRollViewModel.cs   # Piano Roll ViewModel
 ├── Models/
 │   ├── CodeSnippet.cs          # Code Snippet Model
-│   └── MixerChannel.cs         # Mixer Channel Model
+│   ├── MixerChannel.cs         # Mixer Channel Model
+│   └── PianoRollNote.cs        # Piano Roll Note Model
 ├── Controls/
 │   ├── LevelMeter.xaml/.cs     # VU/Peak Meter Control
-│   └── MixerChannelControl.xaml/.cs  # Single Channel Strip
+│   ├── MixerChannelControl.xaml/.cs  # Single Channel Strip
+│   ├── PianoKeyboard.xaml/.cs  # Piano Keys (vertical)
+│   └── NoteCanvas.xaml/.cs     # Note Drawing Canvas
 ├── Services/
 │   └── SnippetService.cs       # Code Snippets (12 built-in)
 └── Themes/                     # WPF Styles
@@ -124,6 +129,15 @@ MusicEngineEditor/
   - 8 Standard-Channels + Master
   - MixerChannel Model und MixerViewModel
 
+- [x] **Piano Roll Editor** - `PianoRollView.xaml/.cs`
+  - Visueller MIDI-Editor mit Note-Grid
+  - PianoKeyboard Control (vertikale Klaviatur)
+  - NoteCanvas Control (Noten-Zeichenfläche)
+  - Tools: Select, Draw, Erase
+  - Grid-Snap (1/4, 1/8, 1/16, 1/32)
+  - Zoom X/Y, Loop-Bereich, Playhead
+  - Keyboard Shortcuts (Del, Ctrl+A, Ctrl+D, 1/2/3, +/-)
+
 ## Build Status
 ```
 MusicEngine:       0 Fehler, 0 Warnungen
@@ -136,7 +150,6 @@ Tests:             136/136 bestanden
 ### Mittel Priorität
 - [ ] Async Operations (InitializeAsync, ScanForPluginsAsync)
 - [ ] Extension System (ISynthExtension, IEffectExtension, Discovery)
-- [ ] Piano Roll Editor (visueller MIDI Editor)
 
 ### Niedrig Priorität
 - [ ] Memory Pooling (AudioBufferPool)
@@ -210,6 +223,12 @@ exporter.ExportPattern(pattern, "output.mid", 120);
    - MixerChannelControl.xaml/.cs (Fader, Pan, M/S/R, LevelMeter)
    - MixerViewModel.cs (8 Channels + Master, Commands)
    - MixerView.xaml/.cs (Scrollbare Channel-Liste, Toolbar)
+8. **Piano Roll Editor** komplett implementiert:
+   - PianoRollNote.cs Model (MIDI Note Repräsentation)
+   - PianoRollViewModel.cs (Notes, Tools, Zoom, Grid, Commands)
+   - PianoKeyboard.xaml/.cs (Vertikale Klaviatur mit Mouse-Events)
+   - NoteCanvas.xaml/.cs (Note-Rendering, Mouse-Interaktion)
+   - PianoRollView.xaml/.cs (Kombiniert alles, Toolbar, Ruler)
 
 ---
 *Erstellt für Claude Code Terminal Kontext-Wiederherstellung*
