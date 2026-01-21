@@ -1,103 +1,31 @@
 namespace MusicEngine.Core;
 
-/// <summary>
-/// MIDI value validation helpers.
-/// </summary>
 public static class MidiValidation
 {
-    /// <summary>
-    /// Validates that a MIDI note number is in range (0-127).
-    /// </summary>
-    public static int ValidateNote(int note, string? paramName = null)
-    {
-        return Guard.InRange(note, 0, 127, paramName ?? nameof(note));
-    }
+    public const int MinNote = 0;
+    public const int MaxNote = 127;
+    public const int MinVelocity = 0;
+    public const int MaxVelocity = 127;
+    public const int MinChannel = 0;
+    public const int MaxChannel = 15;
+    public const int MinControlValue = 0;
+    public const int MaxControlValue = 127;
+    public const int MinController = 0;
+    public const int MaxController = 127;
+    public const int MinProgram = 0;
+    public const int MaxProgram = 127;
+    public const int MinPitchBend = 0;
+    public const int MaxPitchBend = 16383;
 
-    /// <summary>
-    /// Validates that a MIDI velocity is in range (0-127).
-    /// </summary>
-    public static int ValidateVelocity(int velocity, string? paramName = null)
-    {
-        return Guard.InRange(velocity, 0, 127, paramName ?? nameof(velocity));
-    }
+    public static int ValidateNote(int note) => Guard.InRange(note, MinNote, MaxNote);
+    public static int ValidateVelocity(int velocity) => Guard.InRange(velocity, MinVelocity, MaxVelocity);
+    public static int ValidateChannel(int channel) => Guard.InRange(channel, MinChannel, MaxChannel);
+    public static int ValidateControlValue(int value) => Guard.InRange(value, MinControlValue, MaxControlValue);
+    public static int ValidateController(int controller) => Guard.InRange(controller, MinController, MaxController);
+    public static int ValidateProgram(int program) => Guard.InRange(program, MinProgram, MaxProgram);
+    public static int ValidatePitchBend(int pitchBend) => Guard.InRange(pitchBend, MinPitchBend, MaxPitchBend);
 
-    /// <summary>
-    /// Validates that a MIDI channel is in range (0-15).
-    /// </summary>
-    public static int ValidateChannel(int channel, string? paramName = null)
-    {
-        return Guard.InRange(channel, 0, 15, paramName ?? nameof(channel));
-    }
-
-    /// <summary>
-    /// Validates that a MIDI controller number is in range (0-127).
-    /// </summary>
-    public static int ValidateController(int controller, string? paramName = null)
-    {
-        return Guard.InRange(controller, 0, 127, paramName ?? nameof(controller));
-    }
-
-    /// <summary>
-    /// Validates that a MIDI program number is in range (0-127).
-    /// </summary>
-    public static int ValidateProgram(int program, string? paramName = null)
-    {
-        return Guard.InRange(program, 0, 127, paramName ?? nameof(program));
-    }
-
-    /// <summary>
-    /// Validates that a MIDI pitch bend value is in range (0-16383).
-    /// </summary>
-    public static int ValidatePitchBend(int pitchBend, string? paramName = null)
-    {
-        return Guard.InRange(pitchBend, 0, 16383, paramName ?? nameof(pitchBend));
-    }
-
-    /// <summary>
-    /// Clamps a MIDI note number to valid range (0-127).
-    /// </summary>
-    public static int ClampNote(int note)
-    {
-        return Math.Clamp(note, 0, 127);
-    }
-
-    /// <summary>
-    /// Clamps a MIDI velocity to valid range (0-127).
-    /// </summary>
-    public static int ClampVelocity(int velocity)
-    {
-        return Math.Clamp(velocity, 0, 127);
-    }
-
-    /// <summary>
-    /// Clamps a MIDI channel to valid range (0-15).
-    /// </summary>
-    public static int ClampChannel(int channel)
-    {
-        return Math.Clamp(channel, 0, 15);
-    }
-
-    /// <summary>
-    /// Determines if a note number is valid.
-    /// </summary>
-    public static bool IsValidNote(int note)
-    {
-        return note >= 0 && note <= 127;
-    }
-
-    /// <summary>
-    /// Determines if a velocity is valid.
-    /// </summary>
-    public static bool IsValidVelocity(int velocity)
-    {
-        return velocity >= 0 && velocity <= 127;
-    }
-
-    /// <summary>
-    /// Determines if a channel is valid.
-    /// </summary>
-    public static bool IsValidChannel(int channel)
-    {
-        return channel >= 0 && channel <= 15;
-    }
+    public static bool IsValidNote(int note) => note >= MinNote && note <= MaxNote;
+    public static bool IsValidVelocity(int velocity) => velocity >= MinVelocity && velocity <= MaxVelocity;
+    public static bool IsValidChannel(int channel) => channel >= MinChannel && channel <= MaxChannel;
 }

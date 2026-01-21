@@ -14,6 +14,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using MusicEngine.Core.Events;
+using MusicEngine.Core.Progress;
 using MusicEngine.Core.Vst.Vst3.Interfaces;
 using MusicEngine.Core.Vst.Vst3.Structures;
 using NAudio.Wave;
@@ -248,6 +249,155 @@ public class VstHost : IDisposable
                 return new List<VstPluginInfo>(_discoveredPlugins);
             }
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Asynchronously scans for VST plugins with progress reporting using the new record-based progress type.
+    /// </summary>
+    /// <param name="progress">Optional progress reporter using the <see cref="Progress.VstScanProgress"/> record.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the scan.</param>
+    /// <returns>A list of discovered VST2 plugin information.</returns>
+    /// <remarks>
+    /// This overload uses the immutable <see cref="Progress.VstScanProgress"/> record type for progress reporting,
+    /// which provides a cleaner API with computed properties like <see cref="Progress.VstScanProgress.PercentComplete"/>.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var vstHost = new VstHost();
+    /// var progress = new Progress&lt;VstScanProgress&gt;(p =>
+    ///     Console.WriteLine($"[{p.PercentComplete:F0}%] {p.CurrentPlugin} - {(p.IsValid ? "Valid" : "Invalid")}"));
+    ///
+    /// var plugins = await vstHost.ScanForPluginsAsync(progress, cancellationToken);
+    /// </code>
+    /// </example>
+    public async Task<List<VstPluginInfo>> ScanForPluginsAsync(
+        IProgress<Progress.VstScanProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        return await Task.Run(() =>
+        {
+            lock (_lock)
+            {
+                _discoveredPlugins.Clear();
+                _discoveredVst3Plugins.Clear();
+
+                var searchPaths = new List<string>(Settings.VstPluginSearchPaths);
+                if (!string.IsNullOrEmpty(Settings.VstPluginPath))
+                {
+                    searchPaths.Insert(0, Settings.VstPluginPath);
+                }
+
+                // First, collect all files to get accurate total count
+                var allFiles = new List<(string path, bool isVst3, bool isBundle)>();
+
+                foreach (var basePath in searchPaths)
+                {
+                    if (!Directory.Exists(basePath)) continue;
+
+                    try
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        // Collect VST2 plugins (.dll)
+                        foreach (var file in Directory.GetFiles(basePath, "*.dll", SearchOption.AllDirectories))
+                        {
+                            allFiles.Add((file, false, false));
+                        }
+
+                        // Collect VST3 single-file plugins
+                        foreach (var file in Directory.GetFiles(basePath, "*.vst3", SearchOption.AllDirectories))
+                        {
+                            var parentDir = Path.GetDirectoryName(file);
+                            if (parentDir != null && !parentDir.EndsWith("x86_64-win") && !parentDir.EndsWith("Win64"))
+                            {
+                                allFiles.Add((file, true, false));
+                            }
+                        }
+
+                        // Collect VST3 bundles
+                        foreach (var dir in Directory.GetDirectories(basePath, "*.vst3", SearchOption.AllDirectories))
+                        {
+                            allFiles.Add((dir, true, true));
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogWarning(ex, "Error collecting files from VST path '{Path}'", basePath);
+                    }
+                }
+
+                int totalCount = allFiles.Count;
+                int scannedCount = 0;
+
+                progress?.Report(Progress.VstScanProgress.Starting(totalCount));
+
+                foreach (var (path, isVst3, isBundle) in allFiles)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    scannedCount++;
+
+                    var pluginName = Path.GetFileNameWithoutExtension(path);
+                    bool isValid = false;
+                    string? errorMessage = null;
+
+                    try
+                    {
+                        if (isVst3)
+                        {
+                            Vst3PluginInfo? pluginInfo;
+                            if (isBundle)
+                            {
+                                pluginInfo = ScanVst3Bundle(path);
+                            }
+                            else
+                            {
+                                pluginInfo = ProbeVst3Plugin(path);
+                            }
+
+                            if (pluginInfo != null)
+                            {
+                                _discoveredVst3Plugins.Add(pluginInfo);
+                                isValid = true;
+                                pluginName = pluginInfo.Name;
+                            }
+                        }
+                        else
+                        {
+                            var pluginInfo = ProbePlugin(path, false);
+                            if (pluginInfo != null)
+                            {
+                                _discoveredPlugins.Add(pluginInfo);
+                                isValid = true;
+                                pluginName = pluginInfo.Name;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errorMessage = ex.Message;
+                        _logger?.LogWarning(ex, "Error probing plugin '{Path}'", path);
+                    }
+
+                    progress?.Report(new Progress.VstScanProgress(
+                        pluginName,
+                        scannedCount,
+                        totalCount,
+                        isValid,
+                        errorMessage)
+                    {
+                        IsVst3 = isVst3,
+                        CurrentPath = Path.GetDirectoryName(path)
+                    });
+                }
+
+                progress?.Report(Progress.VstScanProgress.Complete(_discoveredPlugins.Count + _discoveredVst3Plugins.Count));
+
+                _logger?.LogInformation("VST scan complete: {Vst2Count} VST2, {Vst3Count} VST3 plugins found",
+                    _discoveredPlugins.Count, _discoveredVst3Plugins.Count);
+
+                return new List<VstPluginInfo>(_discoveredPlugins);
+            }
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>

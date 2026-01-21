@@ -28,7 +28,7 @@ public static class ApiVersion
     /// <summary>
     /// Version string.
     /// </summary>
-    public static string VersionString { get; } = $"{Major}.{Minor}.{Patch}";
+    public static string VersionString => $"{Major}.{Minor}.{Patch}";
 
     /// <summary>
     /// Determines if the specified version is compatible with this API.
@@ -39,9 +39,9 @@ public static class ApiVersion
     }
 
     /// <summary>
-    /// Determines if the specified version is compatible.
+    /// Determines if the specified major version is compatible.
     /// </summary>
-    public static bool IsCompatible(int major, int minor = 0)
+    public static bool IsCompatible(int major)
     {
         return major == Major;
     }

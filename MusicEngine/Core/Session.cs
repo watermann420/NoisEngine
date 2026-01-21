@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
+using MusicEngine.Core.Progress;
 
 
 namespace MusicEngine.Core;
@@ -529,6 +530,193 @@ public class Session
         FilePath = path;
         HasUnsavedChanges = false;
         SessionLoaded?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Asynchronously loads a session from a JSON file with progress reporting.
+    /// </summary>
+    /// <param name="path">Path to the session file.</param>
+    /// <param name="progress">Optional progress reporter using the <see cref="SessionLoadProgress"/> record.</param>
+    /// <param name="ct">Cancellation token to cancel the operation.</param>
+    /// <returns>A task that completes when the session is loaded.</returns>
+    /// <remarks>
+    /// This overload provides detailed progress reporting through the stages:
+    /// Reading File, Parsing JSON, Validating, and Complete.
+    /// Uses <see cref="SessionLoadProgress"/> record for structured progress reporting.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var session = new Session();
+    /// var progress = new Progress&lt;SessionLoadProgress&gt;(p =>
+    ///     Console.WriteLine($"{p.Stage}: {p.PercentComplete:F1}%"));
+    ///
+    /// await session.LoadAsync("project.mep", progress, cancellationToken);
+    /// </code>
+    /// </example>
+    public async Task LoadAsync(
+        string path,
+        IProgress<SessionLoadProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path cannot be null or empty.", nameof(path));
+        }
+
+        const int totalSteps = 4;
+
+        // Step 1: Validate file exists
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Validating", 0, totalSteps, path));
+
+        if (!File.Exists(path))
+        {
+            throw new FileNotFoundException("Session file not found.", path);
+        }
+
+        // Step 2: Read file
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Reading File", 1, totalSteps, path));
+
+        string json = await File.ReadAllTextAsync(path, ct).ConfigureAwait(false);
+
+        // Step 3: Parse JSON
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Parsing JSON", 2, totalSteps, path));
+
+        var options = new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new JsonStringEnumConverter() }
+        };
+
+        var data = JsonSerializer.Deserialize<SessionData>(json, options);
+        if (data == null)
+        {
+            throw new InvalidDataException("Failed to deserialize session file.");
+        }
+
+        // Step 4: Validate and apply
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Validating", 3, totalSteps, path));
+
+        // Basic validation
+        if (data.BPM <= 0 || data.BPM > 999)
+        {
+            throw new InvalidDataException($"Invalid BPM value: {data.BPM}");
+        }
+
+        if (data.SampleRate < 8000 || data.SampleRate > 192000)
+        {
+            throw new InvalidDataException($"Invalid sample rate: {data.SampleRate}");
+        }
+
+        Data = data;
+        FilePath = path;
+        HasUnsavedChanges = false;
+
+        progress?.Report(SessionLoadProgress.Complete(totalSteps));
+        SessionLoaded?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Asynchronously saves the session to a JSON file with progress reporting.
+    /// </summary>
+    /// <param name="path">Path to save the session file.</param>
+    /// <param name="progress">Optional progress reporter using the <see cref="SessionLoadProgress"/> record.</param>
+    /// <param name="ct">Cancellation token to cancel the operation.</param>
+    /// <returns>A task that completes when the session is saved.</returns>
+    /// <remarks>
+    /// This overload provides detailed progress reporting through the stages:
+    /// Preparing, Serializing, Writing File, and Complete.
+    /// Uses <see cref="SessionLoadProgress"/> record for structured progress reporting.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var session = new Session();
+    /// session.Data.BPM = 140f;
+    ///
+    /// var progress = new Progress&lt;SessionLoadProgress&gt;(p =>
+    ///     Console.WriteLine($"{p.Stage}: {p.PercentComplete:F1}%"));
+    ///
+    /// await session.SaveAsync("project.mep", progress, cancellationToken);
+    /// </code>
+    /// </example>
+    public async Task SaveAsync(
+        string path,
+        IProgress<SessionLoadProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw new ArgumentException("Path cannot be null or empty.", nameof(path));
+        }
+
+        const int totalSteps = 4;
+
+        // Step 1: Prepare
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Preparing", 0, totalSteps, path));
+
+        // Update modification timestamp
+        Data.Metadata.ModifiedDate = DateTime.Now;
+
+        // Validate session before saving
+        var validationErrors = Validate();
+        if (validationErrors.Count > 0)
+        {
+            throw new InvalidDataException($"Session validation failed: {string.Join(", ", validationErrors)}");
+        }
+
+        // Step 2: Serialize
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Serializing", 1, totalSteps, path));
+
+        string json = JsonSerializer.Serialize(Data, DefaultJsonOptions);
+
+        // Step 3: Ensure directory exists and write
+        ct.ThrowIfCancellationRequested();
+        progress?.Report(new SessionLoadProgress("Writing File", 2, totalSteps, path));
+
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        // Write atomically using a temporary file
+        var tempPath = path + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, json, ct).ConfigureAwait(false);
+
+            ct.ThrowIfCancellationRequested();
+
+            // Delete existing file if it exists
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+
+            // Rename temp file to target
+            File.Move(tempPath, path);
+        }
+        catch
+        {
+            // Clean up temp file on failure
+            if (File.Exists(tempPath))
+            {
+                try { File.Delete(tempPath); } catch { /* Ignore cleanup errors */ }
+            }
+            throw;
+        }
+
+        // Step 4: Complete
+        FilePath = path;
+        HasUnsavedChanges = false;
+
+        progress?.Report(SessionLoadProgress.Complete(totalSteps));
+        SessionSaved?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>

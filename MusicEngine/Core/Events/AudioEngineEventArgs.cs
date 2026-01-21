@@ -100,3 +100,30 @@ public class VstScanProgressEventArgs : EventArgs
         CurrentPlugin = currentPlugin;
     }
 }
+
+/// <summary>
+/// Event arguments for audio processing events.
+/// </summary>
+public class AudioProcessingEventArgs : EventArgs
+{
+    /// <summary>
+    /// Number of samples processed in this block.
+    /// </summary>
+    public int SampleCount { get; }
+
+    /// <summary>
+    /// Time taken to process the audio block in milliseconds.
+    /// </summary>
+    public double ProcessingTimeMs { get; }
+
+    /// <summary>
+    /// Creates a new AudioProcessingEventArgs.
+    /// </summary>
+    /// <param name="sampleCount">Number of samples processed.</param>
+    /// <param name="processingTimeMs">Processing time in milliseconds.</param>
+    public AudioProcessingEventArgs(int sampleCount, double processingTimeMs)
+    {
+        SampleCount = sampleCount;
+        ProcessingTimeMs = processingTimeMs;
+    }
+}

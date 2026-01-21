@@ -13,6 +13,7 @@ using NAudio.Midi;
 using NAudio.Wave.SampleProviders;
 using Microsoft.Extensions.Logging;
 using MusicEngine.Core.Events;
+using MusicEngine.Core.Progress;
 using MusicEngine.Infrastructure.Logging;
 using MusicEngine.Infrastructure.Memory;
 
@@ -414,13 +415,38 @@ public class AudioEngine : IDisposable
     /// <summary>
     /// Asynchronously initializes the audio engine with progress reporting.
     /// </summary>
+    /// <param name="progress">Optional progress reporter for initialization status.</param>
+    /// <param name="cancellationToken">Cancellation token to cancel the initialization.</param>
+    /// <returns>A task that completes when initialization is finished.</returns>
+    /// <remarks>
+    /// This method performs the following initialization steps:
+    /// <list type="number">
+    /// <item>Sets up the default audio output device</item>
+    /// <item>Enumerates available audio input and output devices</item>
+    /// <item>Enumerates MIDI input and output devices</item>
+    /// <item>Scans for VST plugins</item>
+    /// </list>
+    /// Uses <see cref="Progress.InitializationProgress"/> record for structured progress reporting.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var engine = new AudioEngine();
+    /// var progress = new Progress&lt;InitializationProgress&gt;(p =>
+    ///     Console.WriteLine($"{p.Stage}: {p.PercentComplete:F1}%"));
+    ///
+    /// await engine.InitializeAsync(progress, cancellationToken);
+    /// </code>
+    /// </example>
     public async Task InitializeAsync(
-        IProgress<InitializationProgress>? progress = null,
+        IProgress<Progress.InitializationProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        const int totalSteps = 5;
+
         await Task.Run(() =>
         {
-            progress?.Report(new InitializationProgress { Stage = "Audio Output", CurrentStep = 1, TotalSteps = 5 });
+            progress?.Report(new Progress.InitializationProgress(
+                "Audio Output", 1, totalSteps, "Setting up default audio output device"));
 
             // Setup default output
             var output = new WaveOutEvent();
@@ -429,7 +455,9 @@ public class AudioEngine : IDisposable
             _outputs.Add(output);
 
             cancellationToken.ThrowIfCancellationRequested();
-            progress?.Report(new InitializationProgress { Stage = "Audio Devices", CurrentStep = 2, TotalSteps = 5 });
+            progress?.Report(new Progress.InitializationProgress(
+                "Audio Devices", 2, totalSteps,
+                $"Found {WaveOut.DeviceCount} output, {WaveIn.DeviceCount} input devices"));
 
             // Enumerate Audio Outputs
             for (int i = 0; i < WaveOut.DeviceCount; i++)
@@ -446,7 +474,9 @@ public class AudioEngine : IDisposable
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            progress?.Report(new InitializationProgress { Stage = "MIDI Devices", CurrentStep = 3, TotalSteps = 5 });
+            progress?.Report(new Progress.InitializationProgress(
+                "MIDI Devices", 3, totalSteps,
+                $"Found {MidiIn.NumberOfDevices} MIDI inputs, {MidiOut.NumberOfDevices} MIDI outputs"));
 
             // Enumerate MIDI Inputs (simplified - the full MIDI setup remains in sync Initialize)
             for (int i = 0; i < MidiIn.NumberOfDevices; i++)
@@ -465,7 +495,8 @@ public class AudioEngine : IDisposable
             }
 
             cancellationToken.ThrowIfCancellationRequested();
-            progress?.Report(new InitializationProgress { Stage = "VST Plugins", CurrentStep = 4, TotalSteps = 5 });
+            progress?.Report(new Progress.InitializationProgress(
+                "VST Plugins", 4, totalSteps, "Scanning for VST plugins..."));
 
             // Scan for VST Plugins
             _logger?.LogInformation("Scanning for VST Plugins...");
@@ -475,10 +506,10 @@ public class AudioEngine : IDisposable
                 _logger?.LogInformation("Found {Count} VST plugins", vstPlugins.Count);
             }
 
-            progress?.Report(new InitializationProgress { Stage = "Complete", CurrentStep = 5, TotalSteps = 5 });
+            progress?.Report(Progress.InitializationProgress.Complete(totalSteps, "AudioEngine initialization complete"));
             _logger?.LogInformation("AudioEngine initialization complete");
 
-        }, cancellationToken);
+        }, cancellationToken).ConfigureAwait(false);
     }
 
     // Process Note Events

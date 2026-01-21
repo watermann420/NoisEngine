@@ -2,6 +2,8 @@ using FluentAssertions;
 using MusicEngine.Core;
 using MusicEngine.Core.Automation;
 using Xunit;
+using AutomationPoint = MusicEngine.Core.Automation.AutomationPoint;
+using AutomationCurve = MusicEngine.Core.Automation.AutomationCurve;
 
 namespace MusicEngine.Tests.Core;
 
