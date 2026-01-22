@@ -66,6 +66,13 @@ public class VstHost : IDisposable
     public IReadOnlyDictionary<string, IVstPlugin> LoadedPlugins => _loadedPlugins;
 
     /// <summary>
+    /// When true, VST scanning skips native DLL loading to prevent crashes from corrupt plugins.
+    /// Plugin info is derived from filename only. Full probing occurs when loading a plugin.
+    /// Default: true (safe mode enabled)
+    /// </summary>
+    public bool SafeScanMode { get; set; } = true;
+
+    /// <summary>
     /// Scan for VST plugins in configured paths and return discovered plugins.
     /// Scans for both VST2 (.dll) and VST3 (.vst3 files and bundles) plugins.
     /// </summary>
@@ -592,6 +599,13 @@ public class VstHost : IDisposable
 
             var fileInfo = new FileInfo(path);
             if (fileInfo.Length < 1024) return null; // Too small to be a VST3
+
+            // Safe scan mode: Skip native DLL loading to prevent crashes from corrupt plugins
+            if (SafeScanMode)
+            {
+                Console.WriteLine($"[VstHost]         (Safe mode: skipping native probe)");
+                return CreateBasicVst3Info(path);
+            }
 
             // Load the DLL
             moduleHandle = LoadLibraryW(path);

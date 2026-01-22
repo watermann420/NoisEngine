@@ -563,12 +563,15 @@ MusicEngineEditor: 0 Fehler, 0 Warnungen
 - **Ergebnis:** Crash passiert bei Step 8 (VST Scanning)
 
 23. **Debug-Output in VstHost.ScanForPlugins()** (22.01.2026):
-- Detaillierte Ausgabe für jeden Scan-Schritt:
-  - Welche Pfade werden gescannt
-  - Anzahl gefundener DLL/VST3 Dateien
-  - **Welches Plugin gerade geprobed wird** (zeigt problematisches Plugin)
-  - Erfolgreich erkannte Plugins
-- Der letzte "Probing..." Output vor dem Crash zeigt das problematische Plugin
+- Detaillierte Ausgabe für jeden Scan-Schritt
+- Ergebnis: Crash bei VST3 Plugin (ValhallaSupermassive.vst3 vermutet)
+
+24. **SafeScanMode für VST3 Probing** (22.01.2026):
+- **Problem:** `AccessViolationException` kann in .NET nicht gefangen werden
+- **Lösung:** `VstHost.SafeScanMode` Property (default: `true`)
+- Wenn aktiviert: VST3 Probing überspringt `LoadLibraryW` - nur Dateiname wird verwendet
+- Native Probing erfolgt erst beim expliziten Laden eines Plugins
+- Verhindert Crash bei korrupten/inkompatiblen VST3 Plugins während Scan
 
 ### Build Status nach Session Teil 5:
 ```
