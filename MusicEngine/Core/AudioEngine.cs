@@ -235,30 +235,42 @@ public class AudioEngine : IDisposable
     // Initialize Audio Engine
     public void Initialize()
     {
+        Console.WriteLine("[AudioEngine] Step 1: Creating WaveOutEvent...");
+
         // Setup default output
         var output = new WaveOutEvent(); // Create output device
+
+        Console.WriteLine("[AudioEngine] Step 2: Initializing output device...");
         output.Init(_masterVolume); // Initialize with the master volume
+
+        Console.WriteLine("[AudioEngine] Step 3: Starting playback...");
         output.Play(); // Start playback
         _outputs.Add(output); // Store output
 
+        Console.WriteLine("[AudioEngine] Step 4: Enumerating audio outputs...");
         // Enumerate Audio Outputs
         for (int i = 0; i < WaveOut.DeviceCount; i++)
         {
             var capabilities = WaveOut.GetCapabilities(i); // Get device capabilities
+            Console.WriteLine($"[AudioEngine]   Output {i}: {capabilities.ProductName}");
             _logger?.LogDebug("Found Output Device [{Index}]: {Name}", i, capabilities.ProductName); // Log found device
         }
 
+        Console.WriteLine("[AudioEngine] Step 5: Enumerating audio inputs...");
         // Enumerate Audio Inputs
         for (int i = 0; i < WaveIn.DeviceCount; i++)
         {
             var capabilities = WaveIn.GetCapabilities(i); // Get device capabilities
+            Console.WriteLine($"[AudioEngine]   Input {i}: {capabilities.ProductName}");
             _logger?.LogDebug("Found Input Device [{Index}]: {Name}", i, capabilities.ProductName); // Log found device
         }
-        
+
+        Console.WriteLine("[AudioEngine] Step 6: Enumerating MIDI inputs...");
         // Enumerate MIDI Inputs
         for (int i = 0; i < MidiIn.NumberOfDevices; i++)
         {
             var name = MidiIn.DeviceInfo(i).ProductName; // Get device name
+            Console.WriteLine($"[AudioEngine]   MIDI Input {i}: {name}");
             _logger?.LogDebug("Found MIDI Input [{Index}]: {Name}", i, name); // Log found device
             _midiInputNames[i] = name; // Store device name
             try
@@ -382,10 +394,12 @@ public class AudioEngine : IDisposable
             }
         }
 
+        Console.WriteLine("[AudioEngine] Step 7: Enumerating MIDI outputs...");
         // Enumerate MIDI Outputs
         for (int i = 0; i < MidiOut.NumberOfDevices; i++)
         {
             var name = MidiOut.DeviceInfo(i).ProductName; // Get device name
+            Console.WriteLine($"[AudioEngine]   MIDI Output {i}: {name}");
             _logger?.LogDebug("Found MIDI Output [{Index}]: {Name}", i, name); // Log found device
             _midiOutputNames[i] = name; // Store device name
             try
@@ -395,21 +409,27 @@ public class AudioEngine : IDisposable
             }
             catch (Exception ex) // Handle exceptions
             {
+                Console.WriteLine($"[AudioEngine]   WARNING: Failed to open MIDI Output {i}: {ex.Message}");
                 _logger?.LogWarning(ex, "Failed to open MIDI Output {Index}", i);
             }
         }
 
+        Console.WriteLine("[AudioEngine] Step 8: Scanning for VST plugins...");
         // Scan for VST Plugins
         _logger?.LogDebug("Scanning for VST Plugins...");
         var vstPlugins = ScanVstPlugins();
         if (vstPlugins.Count > 0)
         {
+            Console.WriteLine($"[AudioEngine] Found {vstPlugins.Count} VST plugin(s)");
             PrintVstPlugins();
         }
         else
         {
+            Console.WriteLine("[AudioEngine] No VST plugins found");
             _logger?.LogDebug("No VST plugins found in configured paths.");
         }
+
+        Console.WriteLine("[AudioEngine] Initialization complete!");
     }
 
     /// <summary>

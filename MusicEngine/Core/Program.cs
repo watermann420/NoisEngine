@@ -7,7 +7,4 @@
 using MusicEngine.Scripting;
 
 
-// Parse command line arguments for safe mode (--safe or --no-audio)
-EngineLauncher.ParseArguments(args);
-
 await EngineLauncher.LaunchAsync(); // Start the Music Engine application
