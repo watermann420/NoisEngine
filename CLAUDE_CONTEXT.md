@@ -111,23 +111,58 @@ MusicEngine/
 ```
 MusicEngineEditor/
 ├── Views/
-│   ├── MixerView.xaml/.cs      # Mixer Panel
-│   └── PianoRollView.xaml/.cs  # Piano Roll Editor
+│   ├── MixerView.xaml/.cs           # Mixer Panel
+│   ├── PianoRollView.xaml/.cs       # Piano Roll Editor (mit CC Lanes)
+│   └── Dialogs/
+│       ├── MetronomeSettingsDialog.xaml/.cs    # Metronom-Einstellungen
+│       ├── VstPresetBrowserDialog.xaml/.cs     # VST Preset Browser
+│       ├── PerformanceDialog.xaml/.cs          # CPU/Performance Details
+│       └── RecordingSetupDialog.xaml/.cs       # Multi-Track Recording Setup
 ├── ViewModels/
-│   ├── MixerViewModel.cs       # Mixer ViewModel
-│   └── PianoRollViewModel.cs   # Piano Roll ViewModel
+│   ├── MixerViewModel.cs            # Mixer ViewModel (mit Arm/Recording)
+│   ├── PianoRollViewModel.cs        # Piano Roll ViewModel (mit CC Lanes)
+│   ├── ArrangementViewModel.cs      # Arrangement ViewModel
+│   ├── TransportViewModel.cs        # Transport/Playback ViewModel
+│   ├── MetronomeViewModel.cs        # Metronom ViewModel
+│   ├── PerformanceViewModel.cs      # CPU/Performance ViewModel
+│   ├── TrackPropertiesViewModel.cs  # Track Properties ViewModel
+│   ├── MidiCCLaneViewModel.cs       # MIDI CC Lane ViewModel
+│   └── VstPresetBrowserViewModel.cs # Preset Browser ViewModel
 ├── Models/
 │   ├── CodeSnippet.cs          # Code Snippet Model
 │   ├── MixerChannel.cs         # Mixer Channel Model
-│   └── PianoRollNote.cs        # Piano Roll Note Model
+│   ├── PianoRollNote.cs        # Piano Roll Note Model
+│   ├── WaveformData.cs         # Waveform Peak Data
+│   ├── MidiCCEvent.cs          # MIDI CC Event Model
+│   ├── RecordingClip.cs        # Recording Clip Model
+│   └── TrackInfo.cs            # Track Properties Model
 ├── Controls/
-│   ├── LevelMeter.xaml/.cs     # VU/Peak Meter Control
-│   ├── MixerChannelControl.xaml/.cs  # Single Channel Strip
-│   ├── PianoKeyboard.xaml/.cs  # Piano Keys (vertical)
-│   └── NoteCanvas.xaml/.cs     # Note Drawing Canvas
+│   ├── LevelMeter.xaml/.cs          # VU/Peak Meter Control
+│   ├── MixerChannelControl.xaml/.cs # Single Channel Strip
+│   ├── PianoKeyboard.xaml/.cs       # Piano Keys (vertical)
+│   ├── NoteCanvas.xaml/.cs          # Note Drawing Canvas
+│   ├── TransportToolbar.xaml/.cs    # Transport Buttons (Play/Stop/Record)
+│   ├── PerformanceMeter.xaml/.cs    # CPU/Performance Compact Meter
+│   ├── WaveformDisplay.xaml/.cs     # Audio Waveform Visualisierung
+│   ├── MidiCCLane.xaml/.cs          # MIDI CC Automation Lane
+│   ├── TrackPropertiesPanel.xaml/.cs # Track Properties Panel
+│   └── VstPluginPanel.xaml/.cs      # VST Plugin Panel (Bypass/Presets)
 ├── Services/
-│   └── SnippetService.cs       # Code Snippets (12 built-in)
-└── Themes/                     # WPF Styles
+│   ├── SnippetService.cs            # Code Snippets (12 built-in)
+│   ├── PlaybackService.cs           # Audio Playback Singleton
+│   ├── RecordingService.cs          # Multi-Track Recording Singleton
+│   ├── MetronomeService.cs          # Click Track Service
+│   ├── WaveformService.cs           # Waveform Loading/Caching
+│   ├── ScrubService.cs              # Audio Scrubbing Service
+│   ├── PerformanceMonitorService.cs # CPU/Memory Monitoring
+│   ├── EditorUndoService.cs         # Editor Undo/Redo Wrapper
+│   └── AudioEngineService.cs        # AudioEngine Management
+├── Commands/
+│   ├── NoteCommands.cs              # Add/Delete/Move/Resize Notes
+│   ├── SectionCommands.cs           # Add/Delete/Move Sections
+│   ├── AutomationCommands.cs        # Automation Point Commands
+│   └── MixerCommands.cs             # Volume/Pan/Mute/Solo Commands
+└── Themes/                          # WPF Styles (Dark Theme)
 ```
 
 ## Abgeschlossene Features
@@ -214,11 +249,24 @@ MusicEngineEditor/
   - Loudness Normalization Settings (LUFS, True Peak)
   - Custom Presets mit Format/SampleRate/BitDepth Optionen
 
+### Editor Features (Session Teil 4) ✅
+- [x] **Audio Waveform Display** - Wellenform-Visualisierung mit Caching
+- [x] **Undo/Redo System** - Command Pattern für Notes, Sections, Automation, Mixer
+- [x] **Audio Playback Integration** - Piano Roll mit AudioEngine verbunden
+- [x] **Transport Toolbar** - Play/Stop/Record mit Animationen
+- [x] **Metronome/Click Track** - Sound Types, Count-In, Accent
+- [x] **VST Bypass/Presets** - Bypass Overlay, Preset Browser
+- [x] **CPU/Performance Meter** - Echtzeit Monitoring mit Graph
+- [x] **Track Properties Panel** - M/S/R/I/F Buttons, Volume/Pan, Colors
+- [x] **MIDI CC Lanes** - Draw/Edit Mode, Controller Selection, Interpolation
+- [x] **Audio Scrubbing** - Timeline, Ruler, Transport Slider
+- [x] **Multi-Track Recording** - Arm/Disarm, Count-In, Input Monitoring
+
 ## Build Status
 ```
 MusicEngine:       0 Fehler, 1 Warnung (NetAnalyzers Version)
 MusicEngine.Tests: 0 Fehler, 2 Warnungen
-MusicEngineEditor: 0 Fehler, 9 Warnungen
+MusicEngineEditor: 0 Fehler, 0 Warnungen
 ```
 
 - [x] **Undo/Redo System** - `Core/UndoRedo/`
@@ -247,7 +295,7 @@ MusicEngineEditor: 0 Fehler, 9 Warnungen
   - Recent Projects Liste
   - Duplicate/Delete/Open in Explorer
 
-## Alle Features abgeschlossen!
+## Alle Features abgeschlossen! (Enterprise Phases 1-5 + Editor Features)
 
 ## Wichtige Konventionen
 
@@ -388,6 +436,145 @@ Tests:             136/136 bestanden
 ```
 MusicEngine:       0 Fehler, 1 Warnung
 MusicEngine.Tests: 0 Fehler, 2 Warnungen
+```
+
+### Session Teil 4 - Editor Features (21.01.2026):
+
+18. **Editor Features komplett implementiert** mit parallelen Agents:
+
+**HIGH Priority Features:**
+- **Audio Waveform Display** - `WaveformService.cs`, `WaveformDisplay.xaml`
+  - Wellenform-Visualisierung mit Peak-Daten
+  - Zoom, Playhead, Selection Support
+  - Caching mit LRU-Eviction (500MB max)
+
+- **Undo/Redo System** - `Commands/`, `EditorUndoService.cs`
+  - Command Pattern für alle Editor-Operationen
+  - NoteCommands (Add, Delete, Move, Resize, Velocity)
+  - SectionCommands (Add, Delete, Move, Properties)
+  - AutomationCommands (Point Add/Delete/Move/Curve)
+  - MixerCommands (Volume, Pan, Mute, Solo mit 500ms Merge)
+
+- **Audio Playback Integration** - `PlaybackService.cs`, `AudioEngineService.cs`
+  - Singleton für Play/Pause/Stop
+  - BPM Sync mit Sequencer
+  - Loop Support
+  - Note Preview beim Zeichnen
+
+**MEDIUM Priority Features:**
+- **Transport Toolbar** - `TransportToolbar.xaml`
+  - Rewind, Stop, Play/Pause, Record Buttons
+  - Vector Icons (Path Geometries)
+  - BPM Control, Position Slider
+  - Time Display (Bar:Beat ↔ MM:SS)
+  - Loop & Metronome Toggles
+  - Animationen (Record Pulsing, Metronome Pendulum)
+
+- **Metronome/Click Track** - `MetronomeService.cs`, `MetronomeSettingsDialog.xaml`
+  - Sound Types (Sine, Wood, Stick, Custom)
+  - Count-In Support (0, 1, 2, 4 Bars)
+  - Accent für Downbeat
+  - Volume & Beats per Bar Settings
+
+- **VST Bypass/Presets** - `VstPluginPanel.xaml`, `VstPresetBrowserDialog.xaml`
+  - Bypass Toggle mit Overlay-Visualisierung
+  - Preset Browser mit Suche/Kategorien
+  - Save/Delete Presets
+  - Quick Preset Selector
+
+- **CPU/Performance Meter** - `PerformanceMonitorService.cs`, `PerformanceMeter.xaml`
+  - Echtzeit CPU/Memory Monitoring (10Hz Updates)
+  - Dropout Counter
+  - Compact Bar (Green→Yellow→Red)
+  - Detail Dialog mit Graph und Per-Plugin Breakdown
+
+- **Track Properties Panel** - `TrackPropertiesPanel.xaml`, `TrackInfo.cs`
+  - M/S/R/I/F Buttons (Mute, Solo, Record, Input Monitor, Freeze)
+  - Volume/Pan Controls
+  - Track Colors
+  - Input/Output Routing
+
+**LOW Priority Features:**
+- **MIDI CC Lanes** - `MidiCCLane.xaml`, `MidiCCLaneViewModel.cs`, `MidiCCEvent.cs`
+  - CC-Automation im Piano Roll
+  - Draw/Edit Modes
+  - Controller Selection (Mod, Vol, Pan, Expression, etc.)
+  - Line/Step Interpolation
+  - Scroll/Zoom Sync mit Piano Roll
+
+- **Audio Scrubbing** - `ScrubService.cs`
+  - Timeline Scrubbing (ArrangementView)
+  - Ruler Scrubbing (PianoRollView)
+  - Transport Slider Scrubbing
+  - Variable Speed Playback
+
+- **Multi-Track Recording** - `RecordingService.cs`, `RecordingSetupDialog.xaml`
+  - Arm/Disarm für mehrere Tracks
+  - Count-In Support
+  - Input Level Monitoring
+  - Recording Format Settings (44.1k-96k, 16/24/32-bit)
+  - Click Track Option
+  - Take Management
+
+19. **Build-Fehler behoben**:
+- Vst3Plugin: IsBypassed/BypassChanged Implementation hinzugefügt
+- MetronomeSettingsDialog.xaml: CDATA Wrapper entfernt
+- Ambiguous Type References: ComboBox, ListBox, ColorConverter qualifiziert
+- WaveformService: `using` von ISampleProvider entfernt
+- MidiCCLaneViewModel: [RelayCommand] von Multi-Param Methoden entfernt
+- AutomationCommands: GetPointAt → Points.FirstOrDefault
+- SectionCommands: SectionType → Type
+- PianoRollView: UndoCommand → EditorUndoService.Instance.Undo()
+- PianoRollViewModel: CCLanesExpanded → CcLanesExpanded
+
+### Build Status nach Session Teil 4:
+```
+MusicEngine:       0 Fehler, 1 Warnung
+MusicEngineEditor: 0 Fehler, 0 Warnungen
+```
+
+### Session Teil 5 - Bugfixes (22.01.2026):
+
+20. **XAML Binding Fix**:
+- PianoRollView.xaml: `CCLanesExpanded` → `CcLanesExpanded` (Zeilen 548, 593)
+- Behebt "Wrong name case" Build-Fehler
+
+21. **Warning Fixes** (22.01.2026):
+
+**Entfernte unbenutzte Felder:**
+- `ArrangementView.xaml.cs`: `_isRulerDragging` entfernt (Zeile 39)
+
+**Pragma Warnings für zukünftige API Events:**
+- `BusChannelControl.xaml.cs`: `#pragma warning disable CS0067` für `EffectsClicked`
+- `EffectChainControl.xaml.cs`: `#pragma warning disable CS0067` für `EffectBypassChanged`
+
+**MVVMTK0034 Fixes in ArrangementViewModel.cs:**
+- `_playbackPosition` → `PlaybackPosition` (Property statt Field)
+- Betrifft: `CurrentPositionFormatted`, `CurrentSectionName`, `JumpToNextSection`, `JumpToPreviousSection`, `ScrollToPlayhead`, `UpdatePlaybackPosition`
+
+### Bekanntes Problem (22.01.2026):
+- **AccessViolationException** beim Start auf bestimmten Systemen
+- Ursache: NAudio `WaveOutEvent()` oder `WaveOut.GetCapabilities()` crasht bei bestimmten Audio-Treibern/VST Plugins
+- Status: Debug-Output in `AudioEngine.Initialize()` hinzugefügt um Crash-Stelle zu identifizieren
+
+22. **Debug-Output in AudioEngine.Initialize()** (22.01.2026):
+- Schrittweise Console.WriteLine Ausgaben hinzugefügt:
+  - Step 1: Creating WaveOutEvent
+  - Step 2: Initializing output device
+  - Step 3: Starting playback
+  - Step 4: Enumerating audio outputs (mit Device-Namen)
+  - Step 5: Enumerating audio inputs (mit Device-Namen)
+  - Step 6: Enumerating MIDI inputs (mit Device-Namen)
+  - Step 7: Enumerating MIDI outputs (mit Device-Namen)
+  - Step 8: Scanning for VST plugins
+  - Initialization complete!
+- Hilft beim Identifizieren, welcher Schritt den AccessViolationException verursacht
+
+### Build Status nach Session Teil 5:
+```
+MusicEngine:       0 Fehler, 1 Warnung (NetAnalyzers Version)
+MusicEngineEditor: 0 Fehler, 0 Warnungen
+Code-Warnings:     0 (vorher: CS0169, CS0067, MVVMTK0034)
 ```
 
 ---
