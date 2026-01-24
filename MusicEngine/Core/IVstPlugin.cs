@@ -225,6 +225,17 @@ public interface IVstPlugin : ISynth, IDisposable
     /// Event raised when the bypass state changes.
     /// </summary>
     event EventHandler<bool>? BypassChanged;
+
+    /// <summary>
+    /// Gets the processing latency introduced by this plugin in samples.
+    /// This value is used by the PDC (Plugin Delay Compensation) system
+    /// to align tracks with different latencies.
+    /// </summary>
+    /// <remarks>
+    /// For VST2 plugins, this corresponds to aeffect->initialDelay.
+    /// For VST3 plugins, this is queried from the IAudioProcessor.
+    /// </remarks>
+    int LatencySamples { get; }
 }
 
 /// <summary>

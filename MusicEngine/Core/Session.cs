@@ -252,6 +252,83 @@ public class AutomationPointConfig
 
 
 /// <summary>
+/// Configuration for freeze/bounce operations.
+/// </summary>
+public class FreezeConfig
+{
+    /// <summary>Directory where frozen audio files are stored.</summary>
+    public string FrozenTracksDirectory { get; set; } = "";
+
+    /// <summary>Whether to automatically freeze tracks that exceed CPU threshold.</summary>
+    public bool AutoFreeze { get; set; } = false;
+
+    /// <summary>CPU usage threshold (0-100) for auto-freeze.</summary>
+    public float AutoFreezeCpuThreshold { get; set; } = 80f;
+
+    /// <summary>Whether to save frozen audio to disk.</summary>
+    public bool SaveToFile { get; set; } = true;
+
+    /// <summary>Whether to keep frozen audio in memory.</summary>
+    public bool KeepInMemory { get; set; } = true;
+
+    /// <summary>Whether to include effects in the freeze.</summary>
+    public bool FreezeWithEffects { get; set; } = true;
+
+    /// <summary>Tail length in seconds for capturing reverb/delay tails.</summary>
+    public double TailLengthSeconds { get; set; } = 2.0;
+
+    /// <summary>Track indices that are currently frozen.</summary>
+    public List<int> FrozenTrackIndices { get; set; } = new();
+
+    /// <summary>Frozen track data for each frozen track (key is track index).</summary>
+    public Dictionary<int, FrozenTrackConfig> FrozenTracks { get; set; } = new();
+}
+
+
+/// <summary>
+/// Configuration data for a frozen track.
+/// </summary>
+public class FrozenTrackConfig
+{
+    /// <summary>Track index that was frozen.</summary>
+    public int TrackIndex { get; set; }
+
+    /// <summary>Path to the frozen audio file.</summary>
+    public string? AudioFilePath { get; set; }
+
+    /// <summary>Duration of the frozen audio in seconds.</summary>
+    public double DurationSeconds { get; set; }
+
+    /// <summary>BPM at which the track was frozen.</summary>
+    public double FreezeBpm { get; set; } = 120.0;
+
+    /// <summary>Start position in beats where the freeze begins.</summary>
+    public double StartPositionBeats { get; set; }
+
+    /// <summary>End position in beats where the freeze ends.</summary>
+    public double EndPositionBeats { get; set; }
+
+    /// <summary>Sample rate of the frozen audio.</summary>
+    public int SampleRate { get; set; } = 44100;
+
+    /// <summary>Number of channels in the frozen audio.</summary>
+    public int Channels { get; set; } = 2;
+
+    /// <summary>Timestamp when the track was frozen.</summary>
+    public DateTime FreezeTimestamp { get; set; }
+
+    /// <summary>Original synth type name for restoration.</summary>
+    public string OriginalSynthTypeName { get; set; } = "";
+
+    /// <summary>Original synth parameters for restoration.</summary>
+    public Dictionary<string, float> OriginalSynthParameters { get; set; } = new();
+
+    /// <summary>Original effect chain configuration for restoration.</summary>
+    public List<EffectConfig> OriginalEffectChain { get; set; } = new();
+}
+
+
+/// <summary>
 /// Complete session data for serialization.
 /// Contains all engine state that can be saved and loaded.
 /// </summary>
@@ -289,6 +366,9 @@ public class SessionData
 
     /// <summary>Automation data.</summary>
     public AutomationConfig AutomationData { get; set; } = new();
+
+    /// <summary>Freeze/bounce configuration and state.</summary>
+    public FreezeConfig FreezeConfig { get; set; } = new();
 
     /// <summary>Custom data for extensions.</summary>
     public Dictionary<string, string> CustomData { get; set; } = new();

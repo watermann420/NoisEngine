@@ -284,6 +284,12 @@ public class Vst3Plugin : IVst3Plugin
     /// </summary>
     public event EventHandler<bool>? BypassChanged;
 
+    /// <summary>
+    /// Gets the processing latency introduced by this plugin in samples.
+    /// For VST3 plugins, this is queried from the IAudioProcessor interface.
+    /// </summary>
+    public int LatencySamples => GetPluginLatency();
+
     #endregion
 
     #region Properties (IVst3Plugin Implementation)
@@ -1707,6 +1713,32 @@ public class Vst3Plugin : IVst3Plugin
             return false;
 
         return _component.ActivateBus(mediaType, direction, index, active) == (int)Vst3Result.Ok;
+    }
+
+    #endregion
+
+    #region Latency Support
+
+    /// <summary>
+    /// Gets the processing latency reported by the VST3 plugin.
+    /// </summary>
+    /// <returns>The plugin's processing latency in samples, or 0 if not available.</returns>
+    private int GetPluginLatency()
+    {
+        if (_audioProcessor == null)
+            return 0;
+
+        try
+        {
+            // GetLatencySamples returns uint, cast to int for consistency
+            uint latency = _audioProcessor.GetLatencySamples();
+            // Validate the value is reasonable (max ~10 seconds at 48kHz)
+            return latency < 500000 ? (int)latency : 0;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     #endregion

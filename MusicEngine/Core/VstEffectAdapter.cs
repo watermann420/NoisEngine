@@ -6,6 +6,7 @@
 
 using System;
 using NAudio.Wave;
+using MusicEngine.Core.PDC;
 
 
 namespace MusicEngine.Core;
@@ -14,8 +15,9 @@ namespace MusicEngine.Core;
 /// <summary>
 /// Adapter that wraps an IVstPlugin (effect plugin) to implement the IEffect interface.
 /// This allows VST effect plugins to be used in EffectChain alongside built-in effects.
+/// Also implements ILatencyReporter for Plugin Delay Compensation (PDC) support.
 /// </summary>
-public class VstEffectAdapter : IEffect, IDisposable
+public class VstEffectAdapter : IEffect, ILatencyReporter, IDisposable
 {
     private readonly IVstPlugin _plugin;
     private readonly object _lock = new();
@@ -62,6 +64,38 @@ public class VstEffectAdapter : IEffect, IDisposable
     /// Gets the VST format string ("VST2" or "VST3").
     /// </summary>
     public string VstFormat => _plugin.IsVst3 ? "VST3" : "VST2";
+
+    #region ILatencyReporter Implementation
+
+    private int _lastReportedLatency;
+
+    /// <summary>
+    /// Gets the processing latency introduced by this effect in samples.
+    /// Used by the PDC system for delay compensation.
+    /// </summary>
+    public int LatencySamples => _plugin.LatencySamples;
+
+    /// <summary>
+    /// Event raised when the latency of this effect changes.
+    /// </summary>
+    public event EventHandler<LatencyChangedEventArgs>? LatencyChanged;
+
+    /// <summary>
+    /// Checks if the latency has changed and raises the LatencyChanged event if so.
+    /// This should be called periodically or after operations that might change latency.
+    /// </summary>
+    public void CheckLatencyChanged()
+    {
+        int currentLatency = _plugin.LatencySamples;
+        if (currentLatency != _lastReportedLatency)
+        {
+            int oldLatency = _lastReportedLatency;
+            _lastReportedLatency = currentLatency;
+            LatencyChanged?.Invoke(this, new LatencyChangedEventArgs(oldLatency, currentLatency));
+        }
+    }
+
+    #endregion
 
     /// <summary>
     /// Creates a new VST effect adapter.

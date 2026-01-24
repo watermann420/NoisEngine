@@ -13,6 +13,7 @@ using NAudio.Midi;
 using NAudio.Wave.SampleProviders;
 using Microsoft.Extensions.Logging;
 using MusicEngine.Core.Events;
+using MusicEngine.Core.PDC;
 using MusicEngine.Core.Progress;
 using MusicEngine.Infrastructure.Logging;
 using MusicEngine.Infrastructure.Memory;
@@ -52,6 +53,9 @@ public class AudioEngine : IDisposable
     // Virtual Audio Channels
     private readonly VirtualChannelManager _virtualChannels = new();
 
+    // Plugin Delay Compensation (PDC)
+    private readonly PdcManager _pdcManager;
+
     // Logging
     private readonly ILogger? _logger;
 
@@ -75,6 +79,9 @@ public class AudioEngine : IDisposable
         _mixer = new MixingSampleProvider(_waveFormat); // Initialize mixer
         _mixer.ReadFully = true; // Ensure continuous output
         _masterVolume = new VolumeSampleProvider(_mixer); // Master volume control
+
+        // Initialize PDC Manager
+        _pdcManager = new PdcManager(rate, Settings.Channels, logger);
 
         _logger?.LogInformation("AudioEngine initialized with sample rate {SampleRate}Hz", rate);
     }
@@ -784,6 +791,109 @@ public class AudioEngine : IDisposable
         return new AudioRecorder(_masterVolume, _waveFormat.SampleRate, _waveFormat.Channels);
     }
 
+    // === Plugin Delay Compensation (PDC) Methods ===
+
+    /// <summary>
+    /// Gets the PDC Manager for managing plugin delay compensation across tracks.
+    /// </summary>
+    public PdcManager PdcManager => _pdcManager;
+
+    /// <summary>
+    /// Gets or sets whether Plugin Delay Compensation is enabled.
+    /// </summary>
+    public bool PdcEnabled
+    {
+        get => _pdcManager.Enabled;
+        set => _pdcManager.Enabled = value;
+    }
+
+    /// <summary>
+    /// Gets the maximum latency across all registered PDC tracks in samples.
+    /// </summary>
+    public int PdcMaxLatencySamples => _pdcManager.MaxLatencySamples;
+
+    /// <summary>
+    /// Gets the maximum latency across all registered PDC tracks in milliseconds.
+    /// </summary>
+    public double PdcMaxLatencyMs => _pdcManager.MaxLatencyMs;
+
+    /// <summary>
+    /// Registers a track with its effect chain for PDC management.
+    /// </summary>
+    /// <param name="trackId">Unique identifier for the track.</param>
+    /// <param name="effectChain">The effect chain for this track.</param>
+    /// <param name="maxCompensationSamples">Maximum compensation delay capacity (default: 1 second).</param>
+    public void RegisterTrackForPdc(string trackId, EffectChain effectChain, int maxCompensationSamples = 0)
+    {
+        var reporters = effectChain.GetLatencyReporters();
+        _pdcManager.RegisterTrack(trackId, reporters, maxCompensationSamples);
+        _logger?.LogDebug("Registered track '{TrackId}' for PDC with {Count} latency reporters", trackId, reporters.Count);
+    }
+
+    /// <summary>
+    /// Registers a track with a VST plugin for PDC management.
+    /// </summary>
+    /// <param name="trackId">Unique identifier for the track.</param>
+    /// <param name="vstEffectAdapter">The VST effect adapter for this track.</param>
+    /// <param name="maxCompensationSamples">Maximum compensation delay capacity (default: 1 second).</param>
+    public void RegisterTrackForPdc(string trackId, VstEffectAdapter vstEffectAdapter, int maxCompensationSamples = 0)
+    {
+        _pdcManager.RegisterTrack(trackId, vstEffectAdapter, maxCompensationSamples);
+        _logger?.LogDebug("Registered track '{TrackId}' for PDC with VST effect '{EffectName}'", trackId, vstEffectAdapter.Name);
+    }
+
+    /// <summary>
+    /// Unregisters a track from PDC management.
+    /// </summary>
+    /// <param name="trackId">The track identifier.</param>
+    public void UnregisterTrackFromPdc(string trackId)
+    {
+        _pdcManager.UnregisterTrack(trackId);
+        _logger?.LogDebug("Unregistered track '{TrackId}' from PDC", trackId);
+    }
+
+    /// <summary>
+    /// Gets the compensation delay buffer for a track to apply PDC during processing.
+    /// </summary>
+    /// <param name="trackId">The track identifier.</param>
+    /// <returns>The delay compensation buffer, or null if track not found.</returns>
+    public DelayCompensationBuffer? GetPdcBuffer(string trackId)
+    {
+        return _pdcManager.GetCompensationBuffer(trackId);
+    }
+
+    /// <summary>
+    /// Processes audio through PDC compensation for a specific track.
+    /// </summary>
+    /// <param name="trackId">The track identifier.</param>
+    /// <param name="input">Input audio samples.</param>
+    /// <param name="output">Output buffer for compensated audio.</param>
+    /// <param name="offset">Offset into the output buffer.</param>
+    /// <param name="count">Number of samples to process.</param>
+    /// <returns>Number of samples processed.</returns>
+    public int ApplyPdcCompensation(string trackId, float[] input, float[] output, int offset, int count)
+    {
+        return _pdcManager.ProcessCompensation(trackId, input, output, offset, count);
+    }
+
+    /// <summary>
+    /// Manually triggers recalculation of PDC compensation values.
+    /// This is automatically called when track latencies change.
+    /// </summary>
+    public void RecalculatePdc()
+    {
+        _pdcManager.RecalculateCompensation();
+    }
+
+    /// <summary>
+    /// Gets a summary of PDC latencies and compensations for all tracks.
+    /// </summary>
+    /// <returns>Dictionary mapping track IDs to (Latency, Compensation) tuples.</returns>
+    public Dictionary<string, (int Latency, int Compensation)> GetPdcSummary()
+    {
+        return _pdcManager.GetLatencySummary();
+    }
+
     // Dispose resources
     public void Dispose()
     {
@@ -830,5 +940,6 @@ public class AudioEngine : IDisposable
 
         _vstHost.Dispose(); // Dispose VST host and all loaded plugins
         _virtualChannels.Dispose(); // Dispose virtual channels
+        _pdcManager.Dispose(); // Dispose PDC manager
     }
 }

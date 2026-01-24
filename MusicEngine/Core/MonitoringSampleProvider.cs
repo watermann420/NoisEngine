@@ -20,6 +20,7 @@ public sealed class MonitoringSampleProvider : ISampleProvider, IDisposable
     private readonly int _maxBufferSamples;
 
     private bool _isEnabled = true;
+    private bool _directMonitoring;
     private float _volume = 1.0f;
     private float _pan;
     private float _leftPeak;
@@ -44,6 +45,18 @@ public sealed class MonitoringSampleProvider : ISampleProvider, IDisposable
     {
         get => _isEnabled;
         set => _isEnabled = value;
+    }
+
+    /// <summary>
+    /// Gets or sets whether direct monitoring is enabled.
+    /// When true, audio bypasses latency compensation and is passed through
+    /// with minimal delay, suitable for live performance scenarios.
+    /// When false, standard buffered monitoring with latency compensation is used.
+    /// </summary>
+    public bool DirectMonitoring
+    {
+        get => _directMonitoring;
+        set => _directMonitoring = value;
     }
 
     /// <summary>

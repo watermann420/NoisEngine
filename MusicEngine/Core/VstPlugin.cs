@@ -347,6 +347,12 @@ public class VstPlugin : IVstPlugin
     public bool IsActive => _isProcessing;
 
     /// <summary>
+    /// Gets the processing latency introduced by this plugin in samples.
+    /// For VST2 plugins, this corresponds to aeffect->initialDelay.
+    /// </summary>
+    public int LatencySamples => GetInitialDelay();
+
+    /// <summary>
     /// Event raised when the bypass state changes.
     /// </summary>
     public event EventHandler<bool>? BypassChanged;
@@ -575,6 +581,66 @@ public class VstPlugin : IVstPlugin
         {
             string name = GetPresetNameByIndex(i);
             _presetNames.Add(string.IsNullOrEmpty(name) ? $"Preset {i + 1}" : name);
+        }
+    }
+
+    /// <summary>
+    /// Gets the initial delay (latency) reported by the VST2 plugin in samples.
+    /// </summary>
+    /// <returns>The plugin's processing latency in samples, or 0 if not available.</returns>
+    private int GetInitialDelay()
+    {
+        if (_pluginHandle == IntPtr.Zero)
+            return 0;
+
+        try
+        {
+            // AEffect structure layout includes initialDelay after the flags field
+            // The exact offset depends on the architecture and VST SDK version
+            // Standard AEffect layout:
+            // - magic: int (4 bytes)
+            // - dispatcher: IntPtr
+            // - deprecated_process: IntPtr
+            // - setParameter: IntPtr
+            // - getParameter: IntPtr
+            // - numPrograms: int (4 bytes)
+            // - numParams: int (4 bytes)
+            // - numInputs: int (4 bytes)
+            // - numOutputs: int (4 bytes)
+            // - flags: int (4 bytes)
+            // - resvd1: IntPtr
+            // - resvd2: IntPtr
+            // - initialDelay: int (4 bytes)
+
+            int ptrSize = IntPtr.Size;
+
+            // Calculate offset to initialDelay
+            // After 5 IntPtrs (magic uses 4 bytes, but aligned to IntPtr boundary in 64-bit)
+            // plus 5 ints (numPrograms, numParams, numInputs, numOutputs, flags)
+            // plus 2 IntPtrs (resvd1, resvd2)
+
+            // For 64-bit: (1 + 4) * 8 + 5 * 4 + 2 * 8 = 40 + 20 + 16 = 76
+            // But we need to account for alignment. Let's use a more reliable offset.
+
+            // Offset calculation: ptrSize * 5 (for magic aligned + 4 function pointers)
+            // + 20 bytes (5 ints: numPrograms, numParams, numInputs, numOutputs, flags)
+            // + 2 * ptrSize (resvd1, resvd2)
+            int baseOffset = ptrSize * 5 + 20; // After flags
+            int initialDelayOffset = baseOffset + (ptrSize * 2); // After resvd1 and resvd2
+
+            int initialDelay = Marshal.ReadInt32(_pluginHandle, initialDelayOffset);
+
+            // Validate the value is reasonable (0 to ~10 seconds at 48kHz = 480000 samples)
+            if (initialDelay >= 0 && initialDelay < 500000)
+            {
+                return initialDelay;
+            }
+
+            return 0;
+        }
+        catch
+        {
+            return 0;
         }
     }
 

@@ -5,8 +5,10 @@
 
 using System;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using MusicEngine.Core.AudioEncoding;
 using NAudio.Wave;
 
 namespace MusicEngine.Core;
@@ -388,7 +390,8 @@ public class AudioRecorder : IDisposable
 
     /// <summary>
     /// Exports an audio file with the specified preset settings.
-    /// Currently supports basic WAV export. Loudness normalization is not yet implemented.
+    /// Supports WAV, MP3, FLAC, OGG Vorbis, and AIFF formats.
+    /// Loudness normalization is not yet implemented.
     /// </summary>
     /// <param name="inputPath">Path to the input audio file.</param>
     /// <param name="outputPath">Path for the output file.</param>
@@ -416,9 +419,7 @@ public class AudioRecorder : IDisposable
         {
             progress?.Report(new ExportProgress(ExportPhase.Starting, 0, "Starting export..."));
 
-            // For now, do a simple file copy/conversion
-            // Full loudness normalization would require the LoudnessNormalizer class
-            await Task.Run(() =>
+            bool exportSuccess = await Task.Run(async () =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 progress?.Report(new ExportProgress(ExportPhase.Analyzing, 0.1, "Analyzing source..."));
@@ -429,35 +430,36 @@ public class AudioRecorder : IDisposable
                 progress?.Report(new ExportProgress(ExportPhase.Writing, 0.3, "Writing output..."));
 
                 // Create output based on format
-                if (preset.Format == AudioFormat.Wav)
+                switch (preset.Format)
                 {
-                    var format = new NAudio.Wave.WaveFormat(preset.SampleRate, preset.BitDepth, reader.WaveFormat.Channels);
-                    using var writer = new NAudio.Wave.WaveFileWriter(outputPath, format);
+                    case AudioFormat.Wav:
+                        return ExportToWav(reader, outputPath, preset, progress, cancellationToken);
 
-                    float[] buffer = new float[4096];
-                    int samplesRead;
-                    long totalSamples = reader.Length / (reader.WaveFormat.BitsPerSample / 8);
-                    long processedSamples = 0;
+                    case AudioFormat.Mp3:
+                        return ExportToMp3(reader, outputPath, preset, progress, cancellationToken);
 
-                    while ((samplesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
-                    {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        writer.WriteSamples(buffer, 0, samplesRead);
-                        processedSamples += samplesRead;
+                    case AudioFormat.Flac:
+                        return await ExportToFlacAsync(inputPath, outputPath, preset, progress, cancellationToken);
 
-                        double progressValue = 0.3 + (0.6 * processedSamples / totalSamples);
-                        progress?.Report(new ExportProgress(ExportPhase.Writing, progressValue,
-                            $"Writing: {progressValue * 100:F0}%"));
-                    }
+                    case AudioFormat.Ogg:
+                        return await ExportToOggAsync(inputPath, outputPath, preset, progress, cancellationToken);
+
+                    case AudioFormat.Aiff:
+                        return await ExportToAiffAsync(inputPath, outputPath, preset, progress, cancellationToken);
+
+                    default:
+                        // Fallback: copy file
+                        System.IO.File.Copy(inputPath, outputPath, true);
+                        return true;
                 }
-                else
-                {
-                    // For non-WAV formats, just copy for now (MP3 encoding would require NAudio.Lame)
-                    System.IO.File.Copy(inputPath, outputPath, true);
-                }
-
-                progress?.Report(new ExportProgress(ExportPhase.Complete, 1.0, "Export complete!"));
             }, cancellationToken);
+
+            if (!exportSuccess)
+            {
+                return ExportResult.Failed($"Export to {preset.Format} format failed. Check if required encoder packages are installed.");
+            }
+
+            progress?.Report(new ExportProgress(ExportPhase.Complete, 1.0, "Export complete!"));
 
             var exportDuration = DateTime.Now - startTime;
             var result = ExportResult.Succeeded(outputPath);
@@ -478,6 +480,227 @@ public class AudioRecorder : IDisposable
         {
             return ExportResult.Failed(ex.Message, ex);
         }
+    }
+
+    /// <summary>
+    /// Exports audio to WAV format.
+    /// </summary>
+    private static bool ExportToWav(
+        NAudio.Wave.AudioFileReader reader,
+        string outputPath,
+        ExportPreset preset,
+        IProgress<ExportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var format = new NAudio.Wave.WaveFormat(preset.SampleRate, preset.BitDepth, reader.WaveFormat.Channels);
+        using var writer = new NAudio.Wave.WaveFileWriter(outputPath, format);
+
+        float[] buffer = new float[4096];
+        int samplesRead;
+        long totalSamples = reader.Length / (reader.WaveFormat.BitsPerSample / 8);
+        long processedSamples = 0;
+
+        while ((samplesRead = reader.Read(buffer, 0, buffer.Length)) > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            writer.WriteSamples(buffer, 0, samplesRead);
+            processedSamples += samplesRead;
+
+            double progressValue = 0.3 + (0.6 * processedSamples / totalSamples);
+            progress?.Report(new ExportProgress(ExportPhase.Writing, progressValue,
+                $"Writing WAV: {progressValue * 100:F0}%"));
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Exports audio to MP3 format using NAudio.Lame via reflection.
+    /// </summary>
+    private static bool ExportToMp3(
+        NAudio.Wave.AudioFileReader reader,
+        string outputPath,
+        ExportPreset preset,
+        IProgress<ExportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Try to use NAudio.Lame for MP3 encoding via reflection
+            var lameType = Type.GetType("NAudio.Lame.LameMP3FileWriter, NAudio.Lame");
+
+            if (lameType == null)
+            {
+                try
+                {
+                    var assembly = System.Reflection.Assembly.Load("NAudio.Lame");
+                    lameType = assembly.GetType("NAudio.Lame.LameMP3FileWriter");
+                }
+                catch (FileNotFoundException)
+                {
+                    System.Diagnostics.Debug.WriteLine("NAudio.Lame not found. Install with: dotnet add package NAudio.Lame");
+                    return false;
+                }
+            }
+
+            if (lameType == null)
+                return false;
+
+            // Get constructor: LameMP3FileWriter(string, WaveFormat, int)
+            var constructor = lameType.GetConstructor(new[] { typeof(string), typeof(WaveFormat), typeof(int) });
+            if (constructor == null)
+                return false;
+
+            int bitRate = preset.BitRate ?? 320;
+            using var writer = (IDisposable)constructor.Invoke(new object[] { outputPath, reader.WaveFormat, bitRate });
+
+            var writeMethod = lameType.GetMethod("Write", new[] { typeof(byte[]), typeof(int), typeof(int) });
+            if (writeMethod == null)
+                return false;
+
+            // Convert float to 16-bit PCM for MP3 encoding
+            float[] floatBuffer = new float[4096];
+            byte[] byteBuffer = new byte[floatBuffer.Length * 2]; // 16-bit = 2 bytes per sample
+            int samplesRead;
+            long totalSamples = reader.Length / (reader.WaveFormat.BitsPerSample / 8);
+            long processedSamples = 0;
+
+            while ((samplesRead = reader.Read(floatBuffer, 0, floatBuffer.Length)) > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Convert float samples to 16-bit PCM
+                int byteCount = samplesRead * 2;
+                for (int i = 0; i < samplesRead; i++)
+                {
+                    short sample = (short)(Math.Clamp(floatBuffer[i], -1.0f, 1.0f) * 32767f);
+                    byteBuffer[i * 2] = (byte)(sample & 0xFF);
+                    byteBuffer[i * 2 + 1] = (byte)((sample >> 8) & 0xFF);
+                }
+
+                writeMethod.Invoke(writer, new object[] { byteBuffer, 0, byteCount });
+                processedSamples += samplesRead;
+
+                double progressValue = 0.3 + (0.6 * processedSamples / totalSamples);
+                progress?.Report(new ExportProgress(ExportPhase.Writing, progressValue,
+                    $"Writing MP3: {progressValue * 100:F0}%"));
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"MP3 export failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Exports audio to FLAC format using the encoder system.
+    /// </summary>
+    private static async Task<bool> ExportToFlacAsync(
+        string inputPath,
+        string outputPath,
+        ExportPreset preset,
+        IProgress<ExportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var settings = EncoderSettings.FromExportPreset(preset);
+        var encoder = EncoderFactory.CreateAndInitialize(settings);
+
+        if (encoder == null)
+        {
+            System.Diagnostics.Debug.WriteLine("FLAC encoder not available. Install NAudio.Flac package.");
+            return false;
+        }
+
+        try
+        {
+            var encoderProgress = new Progress<double>(p =>
+            {
+                double progressValue = 0.3 + (0.6 * p);
+                progress?.Report(new ExportProgress(ExportPhase.Writing, progressValue,
+                    $"Encoding FLAC: {progressValue * 100:F0}%"));
+            });
+
+            return await encoder.EncodeFileAsync(inputPath, outputPath, encoderProgress, cancellationToken);
+        }
+        finally
+        {
+            encoder.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Exports audio to OGG Vorbis format using the encoder system.
+    /// </summary>
+    private static async Task<bool> ExportToOggAsync(
+        string inputPath,
+        string outputPath,
+        ExportPreset preset,
+        IProgress<ExportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var settings = EncoderSettings.FromExportPreset(preset);
+        var encoder = EncoderFactory.CreateAndInitialize(settings);
+
+        if (encoder == null)
+        {
+            System.Diagnostics.Debug.WriteLine("OGG Vorbis encoder not available. Install OggVorbisEncoder package.");
+            return false;
+        }
+
+        try
+        {
+            var encoderProgress = new Progress<double>(p =>
+            {
+                double progressValue = 0.3 + (0.6 * p);
+                progress?.Report(new ExportProgress(ExportPhase.Writing, progressValue,
+                    $"Encoding OGG: {progressValue * 100:F0}%"));
+            });
+
+            return await encoder.EncodeFileAsync(inputPath, outputPath, encoderProgress, cancellationToken);
+        }
+        finally
+        {
+            encoder.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Exports audio to AIFF format using the built-in encoder.
+    /// </summary>
+    private static async Task<bool> ExportToAiffAsync(
+        string inputPath,
+        string outputPath,
+        ExportPreset preset,
+        IProgress<ExportProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var settings = new EncoderSettings
+        {
+            Format = AudioFormat.Aiff,
+            BitDepth = preset.BitDepth,
+            SampleRate = preset.SampleRate,
+            Channels = 2 // Stereo default
+        };
+
+        using var encoder = new AiffEncoder();
+
+        if (!encoder.Initialize(settings))
+        {
+            System.Diagnostics.Debug.WriteLine("AIFF encoder initialization failed.");
+            return false;
+        }
+
+        var encoderProgress = new Progress<double>(p =>
+        {
+            double progressValue = 0.3 + (0.6 * p);
+            progress?.Report(new ExportProgress(ExportPhase.Writing, progressValue,
+                $"Writing AIFF: {progressValue * 100:F0}%"));
+        });
+
+        return await encoder.EncodeFileAsync(inputPath, outputPath, encoderProgress, cancellationToken);
     }
 
     /// <summary>

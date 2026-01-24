@@ -16,10 +16,12 @@ public enum AudioFormat
     Wav,
     /// <summary>MP3 - Lossy compressed audio (requires NAudio.Lame)</summary>
     Mp3,
-    /// <summary>FLAC - Lossless compressed audio</summary>
+    /// <summary>FLAC - Lossless compressed audio (requires NAudio.Flac)</summary>
     Flac,
-    /// <summary>OGG Vorbis - Lossy compressed audio</summary>
-    Ogg
+    /// <summary>OGG Vorbis - Lossy compressed audio (requires OggVorbisEncoder)</summary>
+    Ogg,
+    /// <summary>AIFF - Uncompressed PCM audio (Apple format, big-endian)</summary>
+    Aiff
 }
 
 /// <summary>
@@ -85,6 +87,7 @@ public record ExportPreset(
         AudioFormat.Mp3 => ".mp3",
         AudioFormat.Flac => ".flac",
         AudioFormat.Ogg => ".ogg",
+        AudioFormat.Aiff => ".aiff",
         _ => ".wav"
     };
 
@@ -101,6 +104,7 @@ public record ExportPreset(
                 AudioFormat.Mp3 => $"MP3 {BitRate}kbps",
                 AudioFormat.Flac => $"FLAC {BitDepth}-bit",
                 AudioFormat.Ogg => $"OGG {BitRate}kbps",
+                AudioFormat.Aiff => $"AIFF {BitDepth}-bit",
                 _ => "Unknown"
             };
 

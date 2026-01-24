@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using NAudio.Wave;
+using MusicEngine.Core.PDC;
 
 
 namespace MusicEngine.Core;
@@ -426,6 +427,55 @@ public class EffectChain : ISampleProvider
                 names.Add(effect.Name);
             }
             return names;
+        }
+    }
+
+    /// <summary>
+    /// Gets the total latency in samples introduced by all effects in the chain.
+    /// This sums up the latency from all ILatencyReporter effects (e.g., VST plugins).
+    /// </summary>
+    /// <returns>Total latency in samples.</returns>
+    /// <remarks>
+    /// Only effects that implement ILatencyReporter contribute to this total.
+    /// Built-in effects typically have zero latency unless they implement lookahead.
+    /// </remarks>
+    public int GetTotalLatencySamples()
+    {
+        lock (_lock)
+        {
+            int totalLatency = 0;
+
+            foreach (var effect in _effects)
+            {
+                if (effect is ILatencyReporter latencyReporter)
+                {
+                    totalLatency += latencyReporter.LatencySamples;
+                }
+            }
+
+            return totalLatency;
+        }
+    }
+
+    /// <summary>
+    /// Gets all latency reporters in the chain.
+    /// </summary>
+    /// <returns>List of all effects that implement ILatencyReporter.</returns>
+    public List<ILatencyReporter> GetLatencyReporters()
+    {
+        lock (_lock)
+        {
+            var reporters = new List<ILatencyReporter>();
+
+            foreach (var effect in _effects)
+            {
+                if (effect is ILatencyReporter latencyReporter)
+                {
+                    reporters.Add(latencyReporter);
+                }
+            }
+
+            return reporters;
         }
     }
 
