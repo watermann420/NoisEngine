@@ -73,11 +73,14 @@ public enum ArrangementChangeType
 }
 
 /// <summary>
-/// Manages the complete song arrangement including sections, tempo, and time signature.
+/// Manages the complete song arrangement including sections, clips, regions, tempo, and time signature.
 /// </summary>
 public class Arrangement
 {
     private readonly List<ArrangementSection> _sections = [];
+    private readonly List<AudioClip> _audioClips = [];
+    private readonly List<MidiClip> _midiClips = [];
+    private readonly List<Region> _regions = [];
     private readonly object _lock = new();
 
     /// <summary>Name of the arrangement.</summary>
@@ -138,6 +141,60 @@ public class Arrangement
     /// <summary>Marker track for navigation markers.</summary>
     public MarkerTrack MarkerTrack { get; } = new();
 
+    /// <summary>Gets all audio clips in the arrangement.</summary>
+    public IReadOnlyList<AudioClip> AudioClips
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _audioClips.OrderBy(c => c.StartPosition).ToList().AsReadOnly();
+            }
+        }
+    }
+
+    /// <summary>Gets all MIDI clips in the arrangement.</summary>
+    public IReadOnlyList<MidiClip> MidiClips
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _midiClips.OrderBy(c => c.StartPosition).ToList().AsReadOnly();
+            }
+        }
+    }
+
+    /// <summary>Gets all regions in the arrangement.</summary>
+    public IReadOnlyList<Region> Regions
+    {
+        get
+        {
+            lock (_lock)
+            {
+                return _regions.OrderBy(r => r.StartPosition).ToList().AsReadOnly();
+            }
+        }
+    }
+
+    /// <summary>Gets the number of audio clips.</summary>
+    public int AudioClipCount
+    {
+        get { lock (_lock) { return _audioClips.Count; } }
+    }
+
+    /// <summary>Gets the number of MIDI clips.</summary>
+    public int MidiClipCount
+    {
+        get { lock (_lock) { return _midiClips.Count; } }
+    }
+
+    /// <summary>Gets the number of regions.</summary>
+    public int RegionCount
+    {
+        get { lock (_lock) { return _regions.Count; } }
+    }
+
     /// <summary>Event raised when a section is added.</summary>
     public event EventHandler<SectionEventArgs>? SectionAdded;
 
@@ -149,6 +206,24 @@ public class Arrangement
 
     /// <summary>Event raised when the arrangement structure changes.</summary>
     public event EventHandler<ArrangementChangedEventArgs>? ArrangementChanged;
+
+    /// <summary>Event raised when an audio clip is added.</summary>
+    public event EventHandler<AudioClip>? AudioClipAdded;
+
+    /// <summary>Event raised when an audio clip is removed.</summary>
+    public event EventHandler<AudioClip>? AudioClipRemoved;
+
+    /// <summary>Event raised when a MIDI clip is added.</summary>
+    public event EventHandler<MidiClip>? MidiClipAdded;
+
+    /// <summary>Event raised when a MIDI clip is removed.</summary>
+    public event EventHandler<MidiClip>? MidiClipRemoved;
+
+    /// <summary>Event raised when a region is added.</summary>
+    public event EventHandler<Region>? RegionAdded;
+
+    /// <summary>Event raised when a region is removed.</summary>
+    public event EventHandler<Region>? RegionRemoved;
 
     /// <summary>
     /// Adds a section to the arrangement.
@@ -612,4 +687,581 @@ public class Arrangement
             sorted[i].OrderIndex = i;
         }
     }
+
+    #region Audio Clips
+
+    /// <summary>
+    /// Adds an audio clip to the arrangement.
+    /// </summary>
+    /// <param name="clip">The audio clip to add.</param>
+    /// <returns>True if added successfully.</returns>
+    public bool AddAudioClip(AudioClip clip)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+
+        lock (_lock)
+        {
+            if (_audioClips.Any(c => c.Id == clip.Id))
+                return false;
+
+            _audioClips.Add(clip);
+        }
+
+        AudioClipAdded?.Invoke(this, clip);
+        return true;
+    }
+
+    /// <summary>
+    /// Creates and adds a new audio clip.
+    /// </summary>
+    /// <param name="filePath">Path to the audio file.</param>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="length">Length in beats.</param>
+    /// <param name="trackIndex">Track index.</param>
+    /// <returns>The created audio clip.</returns>
+    public AudioClip AddAudioClip(string filePath, double startPosition, double length, int trackIndex = 0)
+    {
+        var clip = new AudioClip(filePath, startPosition, length, trackIndex);
+        AddAudioClip(clip);
+        return clip;
+    }
+
+    /// <summary>
+    /// Removes an audio clip from the arrangement.
+    /// </summary>
+    /// <param name="clip">The clip to remove.</param>
+    /// <returns>True if removed successfully.</returns>
+    public bool RemoveAudioClip(AudioClip clip)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+
+        if (clip.IsLocked)
+            return false;
+
+        bool removed;
+        lock (_lock)
+        {
+            removed = _audioClips.Remove(clip);
+        }
+
+        if (removed)
+        {
+            AudioClipRemoved?.Invoke(this, clip);
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// Removes an audio clip by its ID.
+    /// </summary>
+    /// <param name="clipId">The clip ID to remove.</param>
+    /// <returns>True if removed successfully.</returns>
+    public bool RemoveAudioClip(Guid clipId)
+    {
+        AudioClip? clip;
+        lock (_lock)
+        {
+            clip = _audioClips.FirstOrDefault(c => c.Id == clipId);
+        }
+
+        return clip != null && RemoveAudioClip(clip);
+    }
+
+    /// <summary>
+    /// Gets an audio clip by its ID.
+    /// </summary>
+    /// <param name="clipId">The clip ID.</param>
+    /// <returns>The clip, or null if not found.</returns>
+    public AudioClip? GetAudioClip(Guid clipId)
+    {
+        lock (_lock)
+        {
+            return _audioClips.FirstOrDefault(c => c.Id == clipId);
+        }
+    }
+
+    /// <summary>
+    /// Gets audio clips at a specific position.
+    /// </summary>
+    /// <param name="position">Position in beats.</param>
+    /// <returns>List of clips at the position.</returns>
+    public IReadOnlyList<AudioClip> GetAudioClipsAt(double position)
+    {
+        lock (_lock)
+        {
+            return _audioClips
+                .Where(c => c.ContainsPosition(position))
+                .OrderBy(c => c.TrackIndex)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Gets audio clips within a range.
+    /// </summary>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="endPosition">End position in beats.</param>
+    /// <returns>List of clips within or overlapping the range.</returns>
+    public IReadOnlyList<AudioClip> GetAudioClipsInRange(double startPosition, double endPosition)
+    {
+        lock (_lock)
+        {
+            return _audioClips
+                .Where(c => c.StartPosition < endPosition && c.EndPosition > startPosition)
+                .OrderBy(c => c.StartPosition)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Gets audio clips on a specific track.
+    /// </summary>
+    /// <param name="trackIndex">Track index.</param>
+    /// <returns>List of clips on the track.</returns>
+    public IReadOnlyList<AudioClip> GetAudioClipsOnTrack(int trackIndex)
+    {
+        lock (_lock)
+        {
+            return _audioClips
+                .Where(c => c.TrackIndex == trackIndex)
+                .OrderBy(c => c.StartPosition)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    #endregion
+
+    #region MIDI Clips
+
+    /// <summary>
+    /// Adds a MIDI clip to the arrangement.
+    /// </summary>
+    /// <param name="clip">The MIDI clip to add.</param>
+    /// <returns>True if added successfully.</returns>
+    public bool AddMidiClip(MidiClip clip)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+
+        lock (_lock)
+        {
+            if (_midiClips.Any(c => c.Id == clip.Id))
+                return false;
+
+            _midiClips.Add(clip);
+        }
+
+        MidiClipAdded?.Invoke(this, clip);
+        return true;
+    }
+
+    /// <summary>
+    /// Creates and adds a new MIDI clip.
+    /// </summary>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="length">Length in beats.</param>
+    /// <param name="trackIndex">Track index.</param>
+    /// <returns>The created MIDI clip.</returns>
+    public MidiClip AddMidiClip(double startPosition, double length, int trackIndex = 0)
+    {
+        var clip = new MidiClip(startPosition, length, trackIndex);
+        AddMidiClip(clip);
+        return clip;
+    }
+
+    /// <summary>
+    /// Creates and adds a new MIDI clip from a Pattern.
+    /// </summary>
+    /// <param name="pattern">The pattern to reference.</param>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="trackIndex">Track index.</param>
+    /// <returns>The created MIDI clip.</returns>
+    public MidiClip AddMidiClip(Pattern pattern, double startPosition, int trackIndex = 0)
+    {
+        var clip = new MidiClip(pattern, startPosition, trackIndex);
+        AddMidiClip(clip);
+        return clip;
+    }
+
+    /// <summary>
+    /// Removes a MIDI clip from the arrangement.
+    /// </summary>
+    /// <param name="clip">The clip to remove.</param>
+    /// <returns>True if removed successfully.</returns>
+    public bool RemoveMidiClip(MidiClip clip)
+    {
+        ArgumentNullException.ThrowIfNull(clip);
+
+        if (clip.IsLocked)
+            return false;
+
+        bool removed;
+        lock (_lock)
+        {
+            removed = _midiClips.Remove(clip);
+        }
+
+        if (removed)
+        {
+            MidiClipRemoved?.Invoke(this, clip);
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// Removes a MIDI clip by its ID.
+    /// </summary>
+    /// <param name="clipId">The clip ID to remove.</param>
+    /// <returns>True if removed successfully.</returns>
+    public bool RemoveMidiClip(Guid clipId)
+    {
+        MidiClip? clip;
+        lock (_lock)
+        {
+            clip = _midiClips.FirstOrDefault(c => c.Id == clipId);
+        }
+
+        return clip != null && RemoveMidiClip(clip);
+    }
+
+    /// <summary>
+    /// Gets a MIDI clip by its ID.
+    /// </summary>
+    /// <param name="clipId">The clip ID.</param>
+    /// <returns>The clip, or null if not found.</returns>
+    public MidiClip? GetMidiClip(Guid clipId)
+    {
+        lock (_lock)
+        {
+            return _midiClips.FirstOrDefault(c => c.Id == clipId);
+        }
+    }
+
+    /// <summary>
+    /// Gets MIDI clips at a specific position.
+    /// </summary>
+    /// <param name="position">Position in beats.</param>
+    /// <returns>List of clips at the position.</returns>
+    public IReadOnlyList<MidiClip> GetMidiClipsAt(double position)
+    {
+        lock (_lock)
+        {
+            return _midiClips
+                .Where(c => c.ContainsPosition(position))
+                .OrderBy(c => c.TrackIndex)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Gets MIDI clips within a range.
+    /// </summary>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="endPosition">End position in beats.</param>
+    /// <returns>List of clips within or overlapping the range.</returns>
+    public IReadOnlyList<MidiClip> GetMidiClipsInRange(double startPosition, double endPosition)
+    {
+        lock (_lock)
+        {
+            return _midiClips
+                .Where(c => c.StartPosition < endPosition && c.EndPosition > startPosition)
+                .OrderBy(c => c.StartPosition)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Gets MIDI clips on a specific track.
+    /// </summary>
+    /// <param name="trackIndex">Track index.</param>
+    /// <returns>List of clips on the track.</returns>
+    public IReadOnlyList<MidiClip> GetMidiClipsOnTrack(int trackIndex)
+    {
+        lock (_lock)
+        {
+            return _midiClips
+                .Where(c => c.TrackIndex == trackIndex)
+                .OrderBy(c => c.StartPosition)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    #endregion
+
+    #region Regions
+
+    /// <summary>
+    /// Adds a region to the arrangement.
+    /// </summary>
+    /// <param name="region">The region to add.</param>
+    /// <returns>True if added successfully.</returns>
+    public bool AddRegion(Region region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+
+        lock (_lock)
+        {
+            if (_regions.Any(r => r.Id == region.Id))
+                return false;
+
+            _regions.Add(region);
+        }
+
+        RegionAdded?.Invoke(this, region);
+        return true;
+    }
+
+    /// <summary>
+    /// Creates and adds a new region.
+    /// </summary>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="endPosition">End position in beats.</param>
+    /// <param name="name">Region name.</param>
+    /// <param name="type">Region type.</param>
+    /// <returns>The created region.</returns>
+    public Region AddRegion(double startPosition, double endPosition, string name = "Region", RegionType type = RegionType.General)
+    {
+        var region = new Region(startPosition, endPosition, name, type);
+        AddRegion(region);
+        return region;
+    }
+
+    /// <summary>
+    /// Sets the loop region for playback.
+    /// </summary>
+    /// <param name="startPosition">Loop start in beats.</param>
+    /// <param name="endPosition">Loop end in beats.</param>
+    /// <returns>The loop region.</returns>
+    public Region SetLoopRegion(double startPosition, double endPosition)
+    {
+        // Remove existing loop regions
+        lock (_lock)
+        {
+            var existingLoops = _regions.Where(r => r.Type == RegionType.Loop).ToList();
+            foreach (var loop in existingLoops)
+            {
+                _regions.Remove(loop);
+                RegionRemoved?.Invoke(this, loop);
+            }
+        }
+
+        var loopRegion = Region.CreateLoop(startPosition, endPosition);
+        AddRegion(loopRegion);
+        return loopRegion;
+    }
+
+    /// <summary>
+    /// Gets the active loop region.
+    /// </summary>
+    /// <returns>The active loop region, or null if none.</returns>
+    public Region? GetLoopRegion()
+    {
+        lock (_lock)
+        {
+            return _regions.FirstOrDefault(r => r.Type == RegionType.Loop && r.IsActive);
+        }
+    }
+
+    /// <summary>
+    /// Removes a region from the arrangement.
+    /// </summary>
+    /// <param name="region">The region to remove.</param>
+    /// <returns>True if removed successfully.</returns>
+    public bool RemoveRegion(Region region)
+    {
+        ArgumentNullException.ThrowIfNull(region);
+
+        if (region.IsLocked)
+            return false;
+
+        bool removed;
+        lock (_lock)
+        {
+            removed = _regions.Remove(region);
+        }
+
+        if (removed)
+        {
+            RegionRemoved?.Invoke(this, region);
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// Removes a region by its ID.
+    /// </summary>
+    /// <param name="regionId">The region ID to remove.</param>
+    /// <returns>True if removed successfully.</returns>
+    public bool RemoveRegion(Guid regionId)
+    {
+        Region? region;
+        lock (_lock)
+        {
+            region = _regions.FirstOrDefault(r => r.Id == regionId);
+        }
+
+        return region != null && RemoveRegion(region);
+    }
+
+    /// <summary>
+    /// Gets a region by its ID.
+    /// </summary>
+    /// <param name="regionId">The region ID.</param>
+    /// <returns>The region, or null if not found.</returns>
+    public Region? GetRegion(Guid regionId)
+    {
+        lock (_lock)
+        {
+            return _regions.FirstOrDefault(r => r.Id == regionId);
+        }
+    }
+
+    /// <summary>
+    /// Gets regions at a specific position.
+    /// </summary>
+    /// <param name="position">Position in beats.</param>
+    /// <returns>List of regions at the position.</returns>
+    public IReadOnlyList<Region> GetRegionsAt(double position)
+    {
+        lock (_lock)
+        {
+            return _regions
+                .Where(r => r.ContainsPosition(position))
+                .OrderBy(r => r.ZOrder)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Gets regions within a range.
+    /// </summary>
+    /// <param name="startPosition">Start position in beats.</param>
+    /// <param name="endPosition">End position in beats.</param>
+    /// <returns>List of regions within or overlapping the range.</returns>
+    public IReadOnlyList<Region> GetRegionsInRange(double startPosition, double endPosition)
+    {
+        lock (_lock)
+        {
+            return _regions
+                .Where(r => r.Overlaps(startPosition, endPosition))
+                .OrderBy(r => r.StartPosition)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    /// <summary>
+    /// Gets regions of a specific type.
+    /// </summary>
+    /// <param name="type">Region type to filter by.</param>
+    /// <returns>List of regions of the specified type.</returns>
+    public IReadOnlyList<Region> GetRegionsByType(RegionType type)
+    {
+        lock (_lock)
+        {
+            return _regions
+                .Where(r => r.Type == type)
+                .OrderBy(r => r.StartPosition)
+                .ToList()
+                .AsReadOnly();
+        }
+    }
+
+    #endregion
+
+    #region Bulk Operations
+
+    /// <summary>
+    /// Clears all clips (audio and MIDI) from the arrangement.
+    /// </summary>
+    /// <param name="includeLockedClips">Whether to remove locked clips.</param>
+    /// <returns>Number of clips removed.</returns>
+    public int ClearClips(bool includeLockedClips = false)
+    {
+        int count = 0;
+
+        lock (_lock)
+        {
+            var audioToRemove = includeLockedClips
+                ? _audioClips.ToList()
+                : _audioClips.Where(c => !c.IsLocked).ToList();
+
+            var midiToRemove = includeLockedClips
+                ? _midiClips.ToList()
+                : _midiClips.Where(c => !c.IsLocked).ToList();
+
+            foreach (var clip in audioToRemove)
+            {
+                _audioClips.Remove(clip);
+                count++;
+            }
+
+            foreach (var clip in midiToRemove)
+            {
+                _midiClips.Remove(clip);
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Clears all regions from the arrangement.
+    /// </summary>
+    /// <param name="includeLockedRegions">Whether to remove locked regions.</param>
+    /// <returns>Number of regions removed.</returns>
+    public int ClearRegions(bool includeLockedRegions = false)
+    {
+        int count;
+
+        lock (_lock)
+        {
+            if (includeLockedRegions)
+            {
+                count = _regions.Count;
+                _regions.Clear();
+            }
+            else
+            {
+                var toRemove = _regions.Where(r => !r.IsLocked).ToList();
+                count = toRemove.Count;
+                foreach (var region in toRemove)
+                {
+                    _regions.Remove(region);
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// Gets the total length of the arrangement including all clips.
+    /// </summary>
+    public double TotalLengthWithClips
+    {
+        get
+        {
+            lock (_lock)
+            {
+                var sectionEnd = _sections.Count > 0 ? _sections.Max(s => s.EffectiveEndPosition) : 0;
+                var audioEnd = _audioClips.Count > 0 ? _audioClips.Max(c => c.EndPosition) : 0;
+                var midiEnd = _midiClips.Count > 0 ? _midiClips.Max(c => c.EndPosition) : 0;
+
+                return Math.Max(Math.Max(sectionEnd, audioEnd), midiEnd);
+            }
+        }
+    }
+
+    #endregion
 }
