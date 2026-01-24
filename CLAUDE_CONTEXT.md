@@ -1438,9 +1438,9 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 ### Phase C: Audio-Verarbeitung
 | Feature | Status | Beschreibung |
 |---------|--------|--------------|
-| **Time Stretching** | TODO | Echtzeit-Tempoänderung |
+| ~~Time Stretching~~ | ✅ Fertig | Phase Vocoder, 0.25x-4.0x |
 | ~~Pitch Shifter~~ | ✅ Fertig | Phase Vocoder Pitch Shifting |
-| **Audio-to-MIDI** | TODO | Konvertiert Audio zu MIDI-Noten |
+| ~~Audio-to-MIDI~~ | ✅ Fertig | YIN Pitch Detection, Onset Detection |
 | ~~Chord Detection~~ | ✅ Fertig | Echtzeit-Akkorderkennung |
 | ~~Key Detection~~ | ✅ Fertig | Krumhansl-Schmuckler Algorithmus |
 | **Noise Reduction** | TODO | Spektrale Subtraktion |
@@ -1462,7 +1462,7 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 | Feature | Status | Beschreibung |
 |---------|--------|--------------|
 | ~~OSC Support~~ | ✅ Fertig | OscServer, OscClient, OscMessage |
-| **Ableton Link** | TODO | Inter-Application Tempo-Sync |
+| ~~LinkSync~~ | ✅ Fertig | UDP Multicast Tempo/Beat Sync |
 | **MIDI over Network** | TODO | RTP-MIDI / ipMIDI |
 | **Cloud Storage** | TODO | Projekt-Sync in die Cloud |
 | **Collaboration** | TODO | Echtzeit Multi-User Editing |
@@ -1502,10 +1502,10 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 4. ~~Chord Detection~~ ✅
 5. ~~Key Detection~~ ✅
 
-**Research/Long-term (Nächste Priorität):**
-1. Time Stretching
-2. Audio-to-MIDI
-3. Ableton Link
+**Research/Long-term - 3/5 FERTIG:**
+1. ~~Time Stretching~~ ✅
+2. ~~Audio-to-MIDI~~ ✅
+3. ~~LinkSync (Ableton Link-Style)~~ ✅
 4. macOS/Linux Port
 5. Plugin Format Export
 
@@ -1523,7 +1523,7 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 - Modulation: Chorus, EnhancedChorus, Flanger, Phaser, Tremolo, Vibrato, AutoPan
 - Distortion: Distortion, Bitcrusher, TapeSaturation
 - Filters: Filter, ParametricEQ
-- Special: Exciter, StereoWidener, Vocoder, RingModulator, TapeStop, PitchShifter (NEU)
+- Special: Exciter, StereoWidener, Vocoder, RingModulator, TapeStop, PitchShifter, TimeStretch (NEU)
 
 **Audio-Features:**
 - VST2/VST3 Hosting mit vollständigen VST3 COM-Interfaces
@@ -1532,6 +1532,7 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 - Multi-Format Export (WAV, MP3, FLAC, OGG, AIFF)
 - Send/Return Bus Architektur
 - LoudnessMeter (LUFS), LoudnessNormalizer
+- TimeStretch (NEU) - Phase Vocoder, 0.25x-4.0x
 
 **Analyse:**
 - SpectrumAnalyzer (31-Band FFT)
@@ -1539,8 +1540,9 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 - EnhancedPeakDetector (True Peak ITU-R BS.1770)
 - TempoDetector, TransientDetector
 - GoniometerDataProvider (Vectorscope)
-- ChordDetector (NEU) - Akkorderkennung mit Template Matching
-- KeyDetector (NEU) - Krumhansl-Schmuckler, Camelot Notation
+- ChordDetector - Akkorderkennung mit Template Matching
+- KeyDetector - Krumhansl-Schmuckler, Camelot Notation
+- AudioToMidi (NEU) - YIN Pitch Detection, Onset Detection
 
 **MIDI & Sequencing:**
 - MIDI Import/Export
@@ -1554,6 +1556,7 @@ MusicEngineEditor: 0 Fehler, 2 Warnungen (nur NetAnalyzers)
 
 **Integration:**
 - OSC Support (OscServer, OscClient, OscMessage, OscBundle)
+- LinkSync (NEU) - UDP Multicast Network Tempo/Beat Sync
 
 ---
 
@@ -1740,6 +1743,56 @@ MusicEngine:       0 Fehler, 4 Warnungen
 ### Aktualisierte Feature-Zählung (Session 12):
 - **Effekte:** 40+ (vorher 35+) - +DynamicEQ, +SpectralGate, +PitchShifter
 - **Analyse:** +ChordDetector, +KeyDetector
+
+---
+
+### Session Teil 13 - Research Features (24.01.2026):
+
+49. **Research Features implementiert (3 Features)**:
+
+**Neue Audio-Verarbeitung:**
+- `Core/Effects/Special/TimeStretchEffect.cs` - Time Stretching
+  - Phase Vocoder Algorithmus (STFT-basiert)
+  - Stretch Range: 0.25x bis 4.0x
+  - Preserve Pitch Option
+  - Quality Modes: Fast (512), Normal (1024), HighQuality (2048)
+  - Peak-Phase-Locking für bessere Transient-Qualität
+  - Presets: SlowMotion, SpeedUp, HalfTime, DoubleTime
+
+**Neue Analyse-Features:**
+- `Core/Analysis/AudioToMidi.cs` - Audio-zu-MIDI Konvertierung
+  - YIN Algorithmus für monophone Pitch Detection
+  - Onset Detection mit Spectral Flux
+  - Note Segmentation mit Attack/Release Thresholds
+  - Velocity Estimation aus RMS
+  - Confidence Threshold für Filterung
+  - Async Processing mit Progress Reporting
+
+**Neue Integration:**
+- `Core/Sync/LinkSync.cs` - Network Tempo Sync
+  - Ableton Link-Style UDP Multicast Synchronisation
+  - Tempo Sync (20-999 BPM)
+  - Beat Position Sync mit Quantisierung
+  - Start/Stop Sync (Sequencer-Integration)
+  - Peer Discovery und Event-Callbacks
+  - PeerDiscovered, PeerLost, TempoChanged, BeatReceived Events
+
+---
+
+### Build Status nach Session Teil 13:
+```
+MusicEngine:       0 Fehler, 6 Warnungen
+```
+
+### Neue Dateien (Session Teil 13): 3 Dateien
+- `Core/Effects/Special/TimeStretchEffect.cs`
+- `Core/Analysis/AudioToMidi.cs`
+- `Core/Sync/LinkSync.cs`
+
+### Aktualisierte Feature-Zählung (Session 13):
+- **Effekte:** 41+ (vorher 40+) - +TimeStretch
+- **Analyse:** +AudioToMidi
+- **Integration:** +LinkSync
 
 ---
 
