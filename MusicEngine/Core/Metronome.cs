@@ -2,6 +2,7 @@
 // copyright (c) 2026 MusicEngine Watermann420 and Contributors
 // Created by Watermann420
 // Description: A metronome/click track for the MusicEngine with configurable sounds and timing.
+//              Supports Sequencer integration with count-in functionality and automatic sync.
 
 
 using System;
@@ -34,8 +35,39 @@ public enum ClickSound
 
 
 /// <summary>
+/// Event arguments for metronome click events.
+/// </summary>
+public class MetronomeClickEventArgs : EventArgs
+{
+    /// <summary>The beat number within the bar (1-indexed).</summary>
+    public int Beat { get; }
+
+    /// <summary>Whether this is the downbeat (first beat of the bar).</summary>
+    public bool IsDownbeat { get; }
+
+    /// <summary>Whether this click is during the count-in phase.</summary>
+    public bool IsCountIn { get; }
+
+    /// <summary>The current bar number (1-indexed, negative during count-in).</summary>
+    public int Bar { get; }
+
+    /// <summary>
+    /// Creates new metronome click event arguments.
+    /// </summary>
+    public MetronomeClickEventArgs(int beat, bool isDownbeat, bool isCountIn, int bar = 0)
+    {
+        Beat = beat;
+        IsDownbeat = isDownbeat;
+        IsCountIn = isCountIn;
+        Bar = bar;
+    }
+}
+
+
+/// <summary>
 /// A metronome/click track implementation that provides audible beat markers.
 /// Implements ISampleProvider for integration with the audio engine.
+/// Supports Sequencer integration with automatic BPM sync and count-in functionality.
 /// </summary>
 public class Metronome : ISampleProvider, IDisposable
 {
@@ -61,6 +93,17 @@ public class Metronome : ISampleProvider, IDisposable
     private Sequencer? _sequencer;
     private double _lastSequencerBeat; // Last beat position from sequencer
     private bool _disposed;
+
+    // Count-in state
+    private int _countIn; // Number of bars to count in (0, 1, 2, or 4)
+    private bool _isCountingIn; // Whether we are currently in count-in phase
+    private int _countInBeatsRemaining; // Remaining beats in count-in
+    private int _countInCurrentBeat; // Current beat within count-in
+    private int _countInCurrentBar; // Current bar within count-in (negative, counting up to 0)
+
+    // Event tracking for sequencer sync
+    private bool _isAttachedToSequencer; // Whether attached via AttachToSequencer
+    private int _lastClickBeat = -1; // Track last click beat to prevent duplicates
 
     /// <summary>Gets or sets the BPM (beats per minute). Syncs with Sequencer if available.</summary>
     public double Bpm
@@ -171,6 +214,12 @@ public class Metronome : ISampleProvider, IDisposable
         get => _sequencer;
         set
         {
+            // Detach from old sequencer if attached
+            if (_isAttachedToSequencer && _sequencer != null)
+            {
+                DetachFromSequencer();
+            }
+
             _sequencer = value;
             if (_sequencer != null)
             {
@@ -179,6 +228,39 @@ public class Metronome : ISampleProvider, IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// Gets or sets the number of count-in bars before playback starts.
+    /// Valid values are 0, 1, 2, or 4. Default is 0 (no count-in).
+    /// </summary>
+    public int CountIn
+    {
+        get => _countIn;
+        set
+        {
+            // Only allow valid count-in values
+            _countIn = value switch
+            {
+                0 => 0,
+                1 => 1,
+                2 => 2,
+                >= 4 => 4,
+                _ => 0
+            };
+        }
+    }
+
+    /// <summary>Gets whether the metronome is currently in count-in phase.</summary>
+    public bool IsCountingIn => _isCountingIn;
+
+    /// <summary>Gets whether the metronome is attached to a sequencer via AttachToSequencer.</summary>
+    public bool IsAttachedToSequencer => _isAttachedToSequencer;
+
+    /// <summary>Fired when a metronome click occurs.</summary>
+    public event EventHandler<MetronomeClickEventArgs>? MetronomeClick;
+
+    /// <summary>Fired when the count-in phase is complete and playback is about to start.</summary>
+    public event EventHandler? CountInComplete;
 
     /// <summary>ISampleProvider implementation - returns the wave format.</summary>
     public WaveFormat WaveFormat => _waveFormat;
@@ -432,6 +514,223 @@ public class Metronome : ISampleProvider, IDisposable
             _isPlayingClick = false;
             _lastSequencerBeat = 0;
             _lastBeatTriggerPosition = -1;
+            _isCountingIn = false;
+            _countInBeatsRemaining = 0;
+            _countInCurrentBeat = 0;
+            _countInCurrentBar = 0;
+            _lastClickBeat = -1;
+        }
+    }
+
+    /// <summary>
+    /// Attaches the metronome to a sequencer for automatic synchronization.
+    /// The metronome will automatically sync BPM and start/stop with the sequencer.
+    /// </summary>
+    /// <param name="sequencer">The sequencer to attach to.</param>
+    public void AttachToSequencer(Sequencer sequencer)
+    {
+        ArgumentNullException.ThrowIfNull(sequencer);
+
+        lock (_lock)
+        {
+            // Detach from previous sequencer if any
+            if (_isAttachedToSequencer && _sequencer != null)
+            {
+                DetachFromSequencerInternal();
+            }
+
+            _sequencer = sequencer;
+            _bpm = sequencer.Bpm;
+            UpdateTimingParameters();
+
+            // Subscribe to sequencer events
+            sequencer.BpmChanged += OnSequencerBpmChanged;
+            sequencer.PlaybackStarted += OnSequencerPlaybackStarted;
+            sequencer.PlaybackStopped += OnSequencerPlaybackStopped;
+            sequencer.BeatChanged += OnSequencerBeatChanged;
+
+            _isAttachedToSequencer = true;
+        }
+    }
+
+    /// <summary>
+    /// Detaches the metronome from the currently attached sequencer.
+    /// </summary>
+    public void DetachFromSequencer()
+    {
+        lock (_lock)
+        {
+            DetachFromSequencerInternal();
+        }
+    }
+
+    /// <summary>
+    /// Internal method to detach from sequencer (must be called within lock).
+    /// </summary>
+    private void DetachFromSequencerInternal()
+    {
+        if (_sequencer != null && _isAttachedToSequencer)
+        {
+            _sequencer.BpmChanged -= OnSequencerBpmChanged;
+            _sequencer.PlaybackStarted -= OnSequencerPlaybackStarted;
+            _sequencer.PlaybackStopped -= OnSequencerPlaybackStopped;
+            _sequencer.BeatChanged -= OnSequencerBeatChanged;
+        }
+
+        _isAttachedToSequencer = false;
+        _isCountingIn = false;
+        _countInBeatsRemaining = 0;
+    }
+
+    /// <summary>
+    /// Starts the count-in phase. Called internally when sequencer starts with CountIn > 0.
+    /// </summary>
+    internal void StartCountIn()
+    {
+        if (_countIn <= 0) return;
+
+        lock (_lock)
+        {
+            _isCountingIn = true;
+            _countInBeatsRemaining = _countIn * _beatsPerBar;
+            _countInCurrentBeat = 0;
+            _countInCurrentBar = -_countIn; // Start at negative bar number
+            _lastClickBeat = -1;
+
+            // Reset position for count-in
+            _samplePosition = 0;
+            _lastBeatTriggerPosition = -1;
+        }
+    }
+
+    /// <summary>
+    /// Handles BPM changes from the attached sequencer.
+    /// </summary>
+    private void OnSequencerBpmChanged(object? sender, ParameterChangedEventArgs e)
+    {
+        lock (_lock)
+        {
+            _bpm = (double)e.NewValue;
+            UpdateTimingParameters();
+        }
+    }
+
+    /// <summary>
+    /// Handles playback start from the attached sequencer.
+    /// </summary>
+    private void OnSequencerPlaybackStarted(object? sender, PlaybackStateEventArgs e)
+    {
+        // Count-in is handled by the sequencer's Start() method via EnableMetronome
+        // This handler is for sync when metronome is attached but sequencer controls start
+        if (!_isCountingIn)
+        {
+            Reset();
+        }
+    }
+
+    /// <summary>
+    /// Handles playback stop from the attached sequencer.
+    /// </summary>
+    private void OnSequencerPlaybackStopped(object? sender, PlaybackStateEventArgs e)
+    {
+        lock (_lock)
+        {
+            _isCountingIn = false;
+            _countInBeatsRemaining = 0;
+            _lastClickBeat = -1;
+        }
+    }
+
+    /// <summary>
+    /// Handles beat changes from the attached sequencer to trigger clicks.
+    /// </summary>
+    private void OnSequencerBeatChanged(object? sender, BeatChangedEventArgs e)
+    {
+        if (!Enabled) return;
+
+        lock (_lock)
+        {
+            // Calculate current beat in bar
+            int beatInBar = (int)Math.Floor(e.CyclePosition) % _beatsPerBar;
+            int absoluteBeat = (int)Math.Floor(e.CurrentBeat);
+
+            // Prevent duplicate clicks on the same beat
+            if (absoluteBeat == _lastClickBeat) return;
+            _lastClickBeat = absoluteBeat;
+
+            // Calculate bar number
+            int bar = (int)Math.Floor(e.CurrentBeat / _beatsPerBar) + 1;
+
+            // Trigger click
+            bool isDownbeat = beatInBar == 0;
+            TriggerClick(beatInBar, isDownbeat, false, bar);
+        }
+    }
+
+    /// <summary>
+    /// Triggers a metronome click and fires the MetronomeClick event.
+    /// </summary>
+    private void TriggerClick(int beat, bool isDownbeat, bool isCountIn, int bar)
+    {
+        // Start playing the click sound
+        _isPlayingClick = true;
+        _clickSamplePosition = 0;
+        _currentBeat = beat;
+
+        // Fire the event
+        MetronomeClick?.Invoke(this, new MetronomeClickEventArgs(
+            beat + 1, // 1-indexed for display
+            isDownbeat,
+            isCountIn,
+            bar
+        ));
+    }
+
+    /// <summary>
+    /// Processes count-in beats and returns true when count-in is complete.
+    /// </summary>
+    internal bool ProcessCountIn(double deltaBeats)
+    {
+        if (!_isCountingIn || _countIn <= 0) return true;
+
+        lock (_lock)
+        {
+            // Track beat transitions during count-in
+            double oldPosition = _samplePosition / _samplesPerBeat;
+            double newPosition = oldPosition + deltaBeats;
+
+            int oldBeat = (int)Math.Floor(oldPosition);
+            int newBeat = (int)Math.Floor(newPosition);
+
+            // Check for beat transition
+            if (newBeat > oldBeat || (oldPosition == 0 && _countInCurrentBeat == 0))
+            {
+                int beatInBar = _countInCurrentBeat % _beatsPerBar;
+                bool isDownbeat = beatInBar == 0;
+
+                TriggerClick(beatInBar, isDownbeat, true, _countInCurrentBar);
+
+                _countInCurrentBeat++;
+                _countInBeatsRemaining--;
+
+                // Update bar number at bar boundaries
+                if (_countInCurrentBeat % _beatsPerBar == 0)
+                {
+                    _countInCurrentBar++;
+                }
+
+                // Check if count-in is complete
+                if (_countInBeatsRemaining <= 0)
+                {
+                    _isCountingIn = false;
+                    CountInComplete?.Invoke(this, EventArgs.Empty);
+                    Reset();
+                    return true; // Count-in complete
+                }
+            }
+
+            _samplePosition = newPosition * _samplesPerBeat;
+            return false; // Still counting in
         }
     }
 
@@ -595,6 +894,12 @@ public class Metronome : ISampleProvider, IDisposable
 
         lock (_lock)
         {
+            // Detach from sequencer first
+            if (_isAttachedToSequencer)
+            {
+                DetachFromSequencerInternal();
+            }
+
             _clickSamples = null;
             _accentClickSamples = null;
             _customSamples = null;

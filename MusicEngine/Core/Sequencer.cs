@@ -3,12 +3,15 @@
 // Created by Watermann420
 // Description: A class for sequencing MIDI patterns and controlling playback with event emission.
 //              Enhanced with high-resolution timing for sample-accurate music production.
+//              Extended with Arrangement support for AudioClips and MidiClips playback.
 
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 
@@ -100,6 +103,19 @@ public class Sequencer : IDisposable
     // Tempo and time signature tracking
     private TempoTrack? _tempoTrack;
 
+    // Arrangement support
+    private Arrangement? _arrangement;
+    private readonly object _arrangementLock = new();
+    private readonly HashSet<Guid> _activeAudioClipIds = [];
+    private readonly HashSet<Guid> _activeMidiClipIds = [];
+    private readonly Dictionary<Guid, ISynth?> _midiClipSynths = new();
+    private bool _loopingEnabled = true;
+
+    // Metronome integration
+    private Metronome? _metronome;
+    private bool _enableMetronome = false;
+    private bool _isWaitingForCountIn = false;
+
     // Event emission for visualization
     private readonly object _eventLock = new();
     private readonly List<MusicalEvent> _activeEvents = new(); // currently playing events
@@ -139,6 +155,21 @@ public class Sequencer : IDisposable
 
     /// <summary>Fired when timing jitter is detected above threshold.</summary>
     public event EventHandler<TimingJitterEventArgs>? TimingJitterDetected;
+
+    /// <summary>Fired when an audio clip starts playing.</summary>
+    public event EventHandler<AudioClipEventArgs>? AudioClipStarted;
+
+    /// <summary>Fired when an audio clip stops playing.</summary>
+    public event EventHandler<AudioClipEventArgs>? AudioClipEnded;
+
+    /// <summary>Fired when a MIDI clip starts playing.</summary>
+    public event EventHandler<MidiClipEventArgs>? MidiClipStarted;
+
+    /// <summary>Fired when a MIDI clip stops playing.</summary>
+    public event EventHandler<MidiClipEventArgs>? MidiClipEnded;
+
+    /// <summary>Fired when the arrangement is changed.</summary>
+    public event EventHandler<ArrangementChangedEventArgs>? ArrangementSet;
 
     // Properties for BPM and current beat
     public double Bpm
@@ -384,6 +415,121 @@ public class Sequencer : IDisposable
         set => _useMidiClockSync = value;
     }
 
+    /// <summary>Gets the currently assigned arrangement.</summary>
+    public Arrangement? Arrangement
+    {
+        get
+        {
+            lock (_arrangementLock)
+            {
+                return _arrangement;
+            }
+        }
+    }
+
+    /// <summary>Gets or sets whether looping is enabled when an arrangement loop region is set.</summary>
+    public bool LoopingEnabled
+    {
+        get => _loopingEnabled;
+        set => _loopingEnabled = value;
+    }
+
+    /// <summary>Gets the IDs of currently playing audio clips.</summary>
+    public IReadOnlySet<Guid> ActiveAudioClipIds
+    {
+        get
+        {
+            lock (_arrangementLock)
+            {
+                return _activeAudioClipIds.ToHashSet();
+            }
+        }
+    }
+
+    /// <summary>Gets the IDs of currently playing MIDI clips.</summary>
+    public IReadOnlySet<Guid> ActiveMidiClipIds
+    {
+        get
+        {
+            lock (_arrangementLock)
+            {
+                return _activeMidiClipIds.ToHashSet();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the metronome associated with this sequencer.
+    /// When set, the metronome will automatically sync with the sequencer.
+    /// </summary>
+    public Metronome? Metronome
+    {
+        get => _metronome;
+        set
+        {
+            // Detach previous metronome if it was attached
+            if (_metronome != null && _metronome.IsAttachedToSequencer)
+            {
+                _metronome.DetachFromSequencer();
+            }
+
+            _metronome = value;
+
+            // Attach new metronome if provided and EnableMetronome is true
+            if (_metronome != null && _enableMetronome)
+            {
+                _metronome.AttachToSequencer(this);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets whether the metronome is enabled.
+    /// When enabled, the metronome will play clicks in sync with the sequencer.
+    /// </summary>
+    public bool EnableMetronome
+    {
+        get => _enableMetronome;
+        set
+        {
+            _enableMetronome = value;
+
+            if (_metronome != null)
+            {
+                if (value && !_metronome.IsAttachedToSequencer)
+                {
+                    _metronome.AttachToSequencer(this);
+                }
+                else if (!value && _metronome.IsAttachedToSequencer)
+                {
+                    _metronome.DetachFromSequencer();
+                }
+
+                _metronome.Enabled = value;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets or sets the number of count-in bars before playback starts.
+    /// Delegates to Metronome.CountIn if a metronome is assigned.
+    /// Valid values are 0, 1, 2, or 4.
+    /// </summary>
+    public int MetronomeCountIn
+    {
+        get => _metronome?.CountIn ?? 0;
+        set
+        {
+            if (_metronome != null)
+            {
+                _metronome.CountIn = value;
+            }
+        }
+    }
+
+    /// <summary>Gets whether the sequencer is currently waiting for count-in to complete.</summary>
+    public bool IsWaitingForCountIn => _isWaitingForCountIn;
+
     /// <summary>
     /// Creates a new sequencer with default settings (backward compatible).
     /// </summary>
@@ -534,11 +680,466 @@ public class Sequencer : IDisposable
         PatternRemoved?.Invoke(this, pattern);
     }
 
+    #region Arrangement Support
+
+    /// <summary>
+    /// Sets the arrangement for playback.
+    /// </summary>
+    /// <param name="arrangement">The arrangement to play, or null to clear.</param>
+    public void SetArrangement(Arrangement? arrangement)
+    {
+        lock (_arrangementLock)
+        {
+            // Stop all active clips from previous arrangement
+            StopAllClipsInternal();
+
+            _arrangement = arrangement;
+            _activeAudioClipIds.Clear();
+            _activeMidiClipIds.Clear();
+            _midiClipSynths.Clear();
+
+            // Sync BPM from arrangement if available
+            if (_arrangement != null)
+            {
+                _bpm = _arrangement.Bpm;
+                _logger?.LogInformation("Arrangement set: {ArrangementName} at {Bpm} BPM",
+                    _arrangement.Name, _arrangement.Bpm);
+            }
+            else
+            {
+                _logger?.LogInformation("Arrangement cleared");
+            }
+        }
+
+        ArrangementSet?.Invoke(this, new ArrangementChangedEventArgs(
+            arrangement != null ? ArrangementChangeType.SectionModified : ArrangementChangeType.Cleared));
+    }
+
+    /// <summary>
+    /// Assigns a synthesizer to a MIDI clip for playback.
+    /// </summary>
+    /// <param name="clipId">The MIDI clip ID.</param>
+    /// <param name="synth">The synthesizer to use for the clip.</param>
+    public void AssignSynthToMidiClip(Guid clipId, ISynth synth)
+    {
+        lock (_arrangementLock)
+        {
+            _midiClipSynths[clipId] = synth;
+        }
+        _logger?.LogDebug("Synth assigned to MIDI clip {ClipId}: {SynthName}", clipId, synth.Name);
+    }
+
+    /// <summary>
+    /// Assigns synthesizers to MIDI clips by track index.
+    /// </summary>
+    /// <param name="trackSynths">Dictionary mapping track index to synthesizer.</param>
+    public void AssignSynthsByTrack(Dictionary<int, ISynth> trackSynths)
+    {
+        if (_arrangement == null) return;
+
+        lock (_arrangementLock)
+        {
+            foreach (var clip in _arrangement.MidiClips)
+            {
+                if (trackSynths.TryGetValue(clip.TrackIndex, out var synth))
+                {
+                    _midiClipSynths[clip.Id] = synth;
+                }
+            }
+        }
+        _logger?.LogDebug("Assigned synths to {Count} tracks", trackSynths.Count);
+    }
+
+    /// <summary>
+    /// Gets the synthesizer assigned to a MIDI clip.
+    /// </summary>
+    /// <param name="clipId">The MIDI clip ID.</param>
+    /// <returns>The assigned synthesizer, or null if none.</returns>
+    public ISynth? GetSynthForMidiClip(Guid clipId)
+    {
+        lock (_arrangementLock)
+        {
+            return _midiClipSynths.GetValueOrDefault(clipId);
+        }
+    }
+
+    /// <summary>
+    /// Stops all currently playing clips from the arrangement.
+    /// </summary>
+    public void StopAllClips()
+    {
+        lock (_arrangementLock)
+        {
+            StopAllClipsInternal();
+        }
+    }
+
+    private void StopAllClipsInternal()
+    {
+        // Send note-off to all synths used by active MIDI clips
+        foreach (var clipId in _activeMidiClipIds.ToList())
+        {
+            if (_midiClipSynths.TryGetValue(clipId, out var synth))
+            {
+                synth?.AllNotesOff();
+            }
+
+            // Fire clip ended event
+            if (_arrangement != null)
+            {
+                var clip = _arrangement.GetMidiClip(clipId);
+                if (clip != null)
+                {
+                    MidiClipEnded?.Invoke(this, new MidiClipEventArgs(clip, _beatAccumulator));
+                }
+            }
+        }
+
+        // Fire audio clip ended events
+        foreach (var clipId in _activeAudioClipIds.ToList())
+        {
+            if (_arrangement != null)
+            {
+                var clip = _arrangement.GetAudioClip(clipId);
+                if (clip != null)
+                {
+                    AudioClipEnded?.Invoke(this, new AudioClipEventArgs(clip, _beatAccumulator));
+                }
+            }
+        }
+
+        _activeAudioClipIds.Clear();
+        _activeMidiClipIds.Clear();
+    }
+
+    /// <summary>
+    /// Processes arrangement clips for the given beat range.
+    /// </summary>
+    /// <param name="startBeat">Start of the beat range.</param>
+    /// <param name="endBeat">End of the beat range.</param>
+    private void ProcessArrangementClips(double startBeat, double endBeat)
+    {
+        if (_arrangement == null) return;
+
+        lock (_arrangementLock)
+        {
+            // Process Audio Clips
+            ProcessAudioClips(startBeat, endBeat);
+
+            // Process MIDI Clips
+            ProcessMidiClips(startBeat, endBeat);
+        }
+    }
+
+    /// <summary>
+    /// Processes audio clips in the arrangement for the given beat range.
+    /// </summary>
+    private void ProcessAudioClips(double startBeat, double endBeat)
+    {
+        if (_arrangement == null) return;
+
+        var audioClips = _arrangement.GetAudioClipsInRange(startBeat, endBeat);
+
+        foreach (var clip in audioClips)
+        {
+            if (clip.IsMuted) continue;
+
+            // Check if clip should start
+            if (clip.StartPosition >= startBeat && clip.StartPosition < endBeat)
+            {
+                if (!_activeAudioClipIds.Contains(clip.Id))
+                {
+                    _activeAudioClipIds.Add(clip.Id);
+                    _logger?.LogDebug("Audio clip started: {ClipName} at beat {Beat}", clip.Name, clip.StartPosition);
+                    AudioClipStarted?.Invoke(this, new AudioClipEventArgs(clip, clip.StartPosition));
+                }
+            }
+
+            // Check if clip should end
+            if (clip.EndPosition > startBeat && clip.EndPosition <= endBeat)
+            {
+                if (_activeAudioClipIds.Contains(clip.Id))
+                {
+                    _activeAudioClipIds.Remove(clip.Id);
+                    _logger?.LogDebug("Audio clip ended: {ClipName} at beat {Beat}", clip.Name, clip.EndPosition);
+                    AudioClipEnded?.Invoke(this, new AudioClipEventArgs(clip, clip.EndPosition));
+                }
+            }
+        }
+
+        // Clean up clips that have ended (position moved past them)
+        var clipIdsToRemove = new List<Guid>();
+        foreach (var clipId in _activeAudioClipIds)
+        {
+            var clip = _arrangement.GetAudioClip(clipId);
+            if (clip == null || endBeat >= clip.EndPosition)
+            {
+                clipIdsToRemove.Add(clipId);
+                if (clip != null)
+                {
+                    _logger?.LogDebug("Audio clip ended (cleanup): {ClipName}", clip.Name);
+                    AudioClipEnded?.Invoke(this, new AudioClipEventArgs(clip, clip.EndPosition));
+                }
+            }
+        }
+        foreach (var id in clipIdsToRemove)
+        {
+            _activeAudioClipIds.Remove(id);
+        }
+    }
+
+    /// <summary>
+    /// Processes MIDI clips in the arrangement for the given beat range.
+    /// </summary>
+    private void ProcessMidiClips(double startBeat, double endBeat)
+    {
+        if (_arrangement == null) return;
+
+        var midiClips = _arrangement.GetMidiClipsInRange(startBeat, endBeat);
+
+        foreach (var clip in midiClips)
+        {
+            if (clip.IsMuted) continue;
+
+            // Check if clip should start
+            if (clip.StartPosition >= startBeat && clip.StartPosition < endBeat)
+            {
+                if (!_activeMidiClipIds.Contains(clip.Id))
+                {
+                    _activeMidiClipIds.Add(clip.Id);
+                    _logger?.LogDebug("MIDI clip started: {ClipName} at beat {Beat}", clip.Name, clip.StartPosition);
+                    MidiClipStarted?.Invoke(this, new MidiClipEventArgs(clip, clip.StartPosition));
+                }
+            }
+
+            // Process notes in the clip
+            var synth = _midiClipSynths.GetValueOrDefault(clip.Id) ?? clip.Pattern?.Synth;
+            if (synth != null)
+            {
+                // Get notes that should trigger in this range
+                var notes = clip.GetNotesInRange(startBeat, endBeat);
+
+                foreach (var note in notes)
+                {
+                    TriggerMidiClipNote(synth, note, clip);
+                }
+            }
+
+            // Check if clip should end
+            if (clip.EndPosition > startBeat && clip.EndPosition <= endBeat)
+            {
+                if (_activeMidiClipIds.Contains(clip.Id))
+                {
+                    _activeMidiClipIds.Remove(clip.Id);
+                    _logger?.LogDebug("MIDI clip ended: {ClipName} at beat {Beat}", clip.Name, clip.EndPosition);
+
+                    // Stop all notes from this clip's synth
+                    synth?.AllNotesOff();
+                    MidiClipEnded?.Invoke(this, new MidiClipEventArgs(clip, clip.EndPosition));
+                }
+            }
+        }
+
+        // Clean up MIDI clips that have ended
+        var clipIdsToRemove = new List<Guid>();
+        foreach (var clipId in _activeMidiClipIds)
+        {
+            var clip = _arrangement.GetMidiClip(clipId);
+            if (clip == null || endBeat >= clip.EndPosition)
+            {
+                clipIdsToRemove.Add(clipId);
+                if (clip != null)
+                {
+                    var synth = _midiClipSynths.GetValueOrDefault(clipId) ?? clip.Pattern?.Synth;
+                    synth?.AllNotesOff();
+                    _logger?.LogDebug("MIDI clip ended (cleanup): {ClipName}", clip.Name);
+                    MidiClipEnded?.Invoke(this, new MidiClipEventArgs(clip, clip.EndPosition));
+                }
+            }
+        }
+        foreach (var id in clipIdsToRemove)
+        {
+            _activeMidiClipIds.Remove(id);
+        }
+    }
+
+    /// <summary>
+    /// Triggers a note from a MIDI clip.
+    /// </summary>
+    private void TriggerMidiClipNote(ISynth synth, NoteEvent note, MidiClip clip)
+    {
+        // Trigger note on
+        synth.NoteOn(note.Note, note.Velocity);
+
+        // Calculate duration in milliseconds
+        var durationMs = note.Duration * (60000.0 / _bpm);
+
+        // Schedule note off asynchronously
+        _ = ScheduleMidiClipNoteOffAsync(synth, note.Note, (int)durationMs, clip);
+    }
+
+    /// <summary>
+    /// Schedules a note-off for a MIDI clip note.
+    /// </summary>
+    private async Task ScheduleMidiClipNoteOffAsync(ISynth synth, int note, int durationMs, MidiClip clip)
+    {
+        try
+        {
+            await Task.Delay(durationMs).ConfigureAwait(false);
+            synth.NoteOff(note);
+        }
+        catch (TaskCanceledException)
+        {
+            // Task was cancelled during shutdown - expected behavior
+        }
+    }
+
+    /// <summary>
+    /// Handles loop region from arrangement.
+    /// </summary>
+    /// <param name="currentBeat">Current beat position.</param>
+    /// <returns>The adjusted beat position after loop handling.</returns>
+    private double HandleArrangementLoop(double currentBeat)
+    {
+        if (!_loopingEnabled || _arrangement == null) return currentBeat;
+
+        var loopRegion = _arrangement.GetLoopRegion();
+        if (loopRegion == null || !loopRegion.IsActive) return currentBeat;
+
+        if (currentBeat >= loopRegion.EndPosition)
+        {
+            // Loop back to start
+            var loopLength = loopRegion.Length;
+            var overshoot = currentBeat - loopRegion.EndPosition;
+            var newPosition = loopRegion.StartPosition + (overshoot % loopLength);
+
+            _logger?.LogDebug("Loop triggered: {OldBeat} -> {NewBeat}", currentBeat, newPosition);
+
+            // Stop clips that are outside the loop region on loop back
+            StopClipsOutsideRange(loopRegion.StartPosition, loopRegion.EndPosition);
+
+            return newPosition;
+        }
+
+        return currentBeat;
+    }
+
+    /// <summary>
+    /// Stops clips that are outside the specified range.
+    /// </summary>
+    private void StopClipsOutsideRange(double startPosition, double endPosition)
+    {
+        lock (_arrangementLock)
+        {
+            if (_arrangement == null) return;
+
+            // Stop audio clips outside range
+            var audioClipsToStop = _activeAudioClipIds
+                .Select(id => _arrangement.GetAudioClip(id))
+                .Where(clip => clip != null && (clip.EndPosition <= startPosition || clip.StartPosition >= endPosition))
+                .ToList();
+
+            foreach (var clip in audioClipsToStop)
+            {
+                if (clip != null)
+                {
+                    _activeAudioClipIds.Remove(clip.Id);
+                    AudioClipEnded?.Invoke(this, new AudioClipEventArgs(clip, _beatAccumulator));
+                }
+            }
+
+            // Stop MIDI clips outside range
+            var midiClipsToStop = _activeMidiClipIds
+                .Select(id => _arrangement.GetMidiClip(id))
+                .Where(clip => clip != null && (clip.EndPosition <= startPosition || clip.StartPosition >= endPosition))
+                .ToList();
+
+            foreach (var clip in midiClipsToStop)
+            {
+                if (clip != null)
+                {
+                    _activeMidiClipIds.Remove(clip.Id);
+                    var synth = _midiClipSynths.GetValueOrDefault(clip.Id) ?? clip.Pattern?.Synth;
+                    synth?.AllNotesOff();
+                    MidiClipEnded?.Invoke(this, new MidiClipEventArgs(clip, _beatAccumulator));
+                }
+            }
+        }
+    }
+
+    #endregion
+
     // Start the sequencer
     public void Start()
     {
         if (_running) return;
+
+        // Check if we need to do count-in
+        if (_enableMetronome && _metronome != null && _metronome.CountIn > 0)
+        {
+            StartWithCountIn();
+            return;
+        }
+
+        StartInternal();
+    }
+
+    /// <summary>
+    /// Starts playback with count-in. The metronome will play count-in bars before pattern playback begins.
+    /// </summary>
+    private void StartWithCountIn()
+    {
+        if (_metronome == null || _metronome.CountIn <= 0) return;
+
+        _isWaitingForCountIn = true;
+
+        // Subscribe to count-in complete event
+        _metronome.CountInComplete += OnCountInComplete;
+
+        // Start the count-in
+        _metronome.StartCountIn();
+
+        // Start count-in playback loop (metronome only, no pattern processing)
         _running = true;
+
+        if (_timingPrecision == TimingPrecision.Standard)
+        {
+            _thread = new Thread(RunCountIn) { IsBackground = true, Priority = ThreadPriority.Highest };
+            _thread.Start();
+        }
+        else
+        {
+            _thread = new Thread(RunCountInHighPrecision) { IsBackground = true, Priority = ThreadPriority.Highest };
+            _thread.Start();
+        }
+
+        _logger?.LogInformation("Sequencer count-in started: {CountInBars} bars at {Bpm} BPM",
+            _metronome.CountIn, _bpm);
+    }
+
+    /// <summary>
+    /// Handles count-in completion to start actual playback.
+    /// </summary>
+    private void OnCountInComplete(object? sender, EventArgs e)
+    {
+        if (_metronome != null)
+        {
+            _metronome.CountInComplete -= OnCountInComplete;
+        }
+
+        _isWaitingForCountIn = false;
+
+        // The count-in loop will exit and StartInternal will be called
+        _logger?.LogInformation("Count-in complete, starting playback");
+    }
+
+    /// <summary>
+    /// Internal start method that initializes the sequencer.
+    /// </summary>
+    private void StartInternal()
+    {
+        _running = true;
+        _isWaitingForCountIn = false;
 
         // Reset jitter tracking
         _timingJitterBuffer.Clear();
@@ -574,6 +1175,7 @@ public class Sequencer : IDisposable
     {
         if (!_running) return;
         _running = false;
+        _isWaitingForCountIn = false;
 
         // Stop high-resolution timer
         lock (_timerLock)
@@ -585,6 +1187,9 @@ public class Sequencer : IDisposable
 
         // Stop MIDI clock
         _midiClockSync?.Stop();
+
+        // Reset metronome count-in state
+        _metronome?.Reset();
 
         // Clear active events
         lock (_eventLock)
@@ -626,6 +1231,202 @@ public class Sequencer : IDisposable
         NoteEnded?.Invoke(this, new MusicalEventArgs(musicalEvent));
     }
 
+    /// <summary>
+    /// Count-in playback loop for standard timing mode.
+    /// Only processes metronome clicks, no pattern playback.
+    /// </summary>
+    private void RunCountIn()
+    {
+        var stopwatch = Stopwatch.StartNew();
+        double lastTime = stopwatch.Elapsed.TotalSeconds;
+
+        while (_running && _isWaitingForCountIn)
+        {
+            double currentTime = stopwatch.Elapsed.TotalSeconds;
+            double deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            // Calculate beat delta
+            double secondsPerBeat = 60.0 / _bpm;
+            double beatsInDelta = deltaTime / secondsPerBeat;
+
+            // Process count-in
+            if (_metronome != null)
+            {
+                bool countInComplete = _metronome.ProcessCountIn(beatsInDelta);
+                if (countInComplete)
+                {
+                    break;
+                }
+            }
+
+            Thread.Sleep(Settings.MidiRefreshRateMs);
+        }
+
+        // If still running after count-in, start actual playback
+        if (_running && !_isWaitingForCountIn)
+        {
+            // Reset beat accumulator to start of pattern
+            _beatAccumulator = 0;
+
+            // Continue with standard playback loop
+            RunStandardInternal(Stopwatch.StartNew(), 0);
+        }
+    }
+
+    /// <summary>
+    /// Count-in playback loop for high-precision timing mode.
+    /// </summary>
+    private void RunCountInHighPrecision()
+    {
+        var stopwatch = Stopwatch.StartNew();
+        double lastTime = stopwatch.Elapsed.TotalSeconds;
+
+        while (_running && _isWaitingForCountIn)
+        {
+            double currentTime = stopwatch.Elapsed.TotalSeconds;
+            double deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+
+            // Calculate beat delta
+            double secondsPerBeat = 60.0 / _bpm;
+            double beatsInDelta = deltaTime / secondsPerBeat;
+
+            // Process count-in
+            if (_metronome != null)
+            {
+                bool countInComplete = _metronome.ProcessCountIn(beatsInDelta);
+                if (countInComplete)
+                {
+                    break;
+                }
+            }
+
+            Thread.Yield();
+        }
+
+        // If still running after count-in, start actual playback
+        if (_running && !_isWaitingForCountIn)
+        {
+            // Reset beat accumulator to start of pattern
+            _beatAccumulator = 0;
+
+            // Fire playback started event now that count-in is complete
+            PlaybackStarted?.Invoke(this, new PlaybackStateEventArgs(true, _beatAccumulator, _bpm));
+
+            // Initialize high-res timer and continue with high-precision playback
+            InitializeHighResTimer();
+            _highResTimer!.Start();
+
+            // Continue with high-precision playback loop using local variables
+            double lastProcessedBeat = 0;
+            double lastBeatEventTime = 0;
+            double beatEventInterval = 1.0 / 120.0;
+            double expectedTickInterval = _highResTimer.TickIntervalMicroseconds / 1_000_000.0;
+            double lastTickTime = 0;
+            var playbackStopwatch = Stopwatch.StartNew();
+
+            while (_running)
+            {
+                double currentTime = playbackStopwatch.Elapsed.TotalSeconds;
+
+                // Calculate timing jitter
+                if (lastTickTime > 0)
+                {
+                    double actualInterval = currentTime - lastTickTime;
+                    double jitter = (actualInterval - expectedTickInterval) * 1000.0;
+
+                    _timingJitterBuffer.Push(jitter);
+                    _averageTimingJitter = _timingJitterBuffer.Average();
+
+                    if (_jitterCompensationEnabled)
+                    {
+                        _jitterCompensationMs = _jitterCompensationMs * 0.95 + _averageTimingJitter * 0.05;
+                    }
+                }
+                lastTickTime = currentTime;
+
+                double nextBeat;
+                lock (_patterns)
+                {
+                    if (!_isScratching)
+                    {
+                        double secondsPerBeat = 60.0 / _bpm;
+                        double deltaTime = currentTime - _lastActualTime;
+                        if (_lastActualTime == 0) deltaTime = 0;
+                        _lastActualTime = currentTime;
+
+                        double beatsInDelta = deltaTime / secondsPerBeat;
+
+                        if (_jitterCompensationEnabled && Math.Abs(_jitterCompensationMs) > 0.001)
+                        {
+                            double compensationBeats = (_jitterCompensationMs / 1000.0) / secondsPerBeat;
+                            beatsInDelta -= compensationBeats * 0.05;
+                        }
+
+                        nextBeat = _beatAccumulator + beatsInDelta;
+                    }
+                    else
+                    {
+                        nextBeat = _beatAccumulator;
+                    }
+
+                    if (nextBeat != lastProcessedBeat)
+                    {
+                        foreach (var pattern in _patterns)
+                        {
+                            pattern.Process(lastProcessedBeat, nextBeat, _bpm);
+                        }
+                        lastProcessedBeat = nextBeat;
+                    }
+
+                    if (!_isScratching)
+                    {
+                        _beatAccumulator = nextBeat;
+                    }
+                }
+
+                if (currentTime - lastBeatEventTime >= beatEventInterval)
+                {
+                    lastBeatEventTime = currentTime;
+                    EmitBeatChanged();
+                }
+
+                Thread.Yield();
+            }
+
+            lock (_timerLock)
+            {
+                _highResTimer?.Stop();
+                _highResTimer?.Dispose();
+                _highResTimer = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Initializes the high-resolution timer.
+    /// </summary>
+    private void InitializeHighResTimer()
+    {
+        lock (_timerLock)
+        {
+            _highResTimer = new HighResolutionTimer();
+            _highResTimer.JitterCompensationEnabled = _jitterCompensationEnabled;
+
+            if (_timingPrecision == TimingPrecision.AudioRate)
+            {
+                _highResTimer.TargetTicksPerSecond = _sampleRate / 128.0;
+                _highResTimer.UseSpinWait = true;
+            }
+            else
+            {
+                double ticksPerSecond = (_bpm / 60.0) * (int)_beatSubdivision * 4;
+                _highResTimer.TargetTicksPerSecond = Math.Min(10000, ticksPerSecond);
+            }
+        }
+    }
+
     // Standard playback loop (backward compatible)
     private void RunStandard()
     {
@@ -634,6 +1435,18 @@ public class Sequencer : IDisposable
         double lastProcessedBeat = _beatAccumulator; // Last processed beat position
         double lastBeatEventTime = 0; // For throttling beat events
         const double beatEventInterval = 1.0 / 60.0; // ~60fps for beat events
+
+        RunStandardInternal(stopwatch, lastProcessedBeat);
+    }
+
+    /// <summary>
+    /// Internal standard playback loop implementation.
+    /// </summary>
+    private void RunStandardInternal(Stopwatch stopwatch, double lastProcessedBeat)
+    {
+        double lastTime = stopwatch.Elapsed.TotalSeconds;
+        double lastBeatEventTime = 0;
+        const double beatEventInterval = 1.0 / 60.0;
 
         while (_running)
         {
@@ -663,12 +1476,20 @@ public class Sequencer : IDisposable
                     nextBeat = _beatAccumulator; // In scratching mode, don't advance
                 }
 
+                // Handle arrangement loop region
+                nextBeat = HandleArrangementLoop(nextBeat);
+
                 if (nextBeat != lastProcessedBeat) // Process patterns if beat has changed
                 {
+                    // Process patterns
                     foreach (var pattern in _patterns) // Process each pattern
                     {
                         pattern.Process(lastProcessedBeat, nextBeat, _bpm); // Process pattern for the beat range
                     }
+
+                    // Process arrangement clips (AudioClips and MidiClips)
+                    ProcessArrangementClips(lastProcessedBeat, nextBeat);
+
                     lastProcessedBeat = nextBeat; // Update last processed beat
                 }
 
@@ -698,29 +1519,20 @@ public class Sequencer : IDisposable
     // High-precision playback loop with jitter compensation
     private void RunHighPrecision()
     {
-        // Create and configure high-resolution timer
-        lock (_timerLock)
-        {
-            _highResTimer = new HighResolutionTimer();
-            _highResTimer.JitterCompensationEnabled = _jitterCompensationEnabled;
-
-            // Configure based on precision mode
-            if (_timingPrecision == TimingPrecision.AudioRate)
-            {
-                // Audio buffer rate (128 samples at sample rate)
-                _highResTimer.TargetTicksPerSecond = _sampleRate / 128.0;
-                _highResTimer.UseSpinWait = true;
-            }
-            else
-            {
-                // High precision mode - tick at subdivision rate * 4 for smooth timing
-                double ticksPerSecond = (_bpm / 60.0) * (int)_beatSubdivision * 4;
-                _highResTimer.TargetTicksPerSecond = Math.Min(10000, ticksPerSecond);
-            }
-        }
-
         var stopwatch = Stopwatch.StartNew();
         double lastProcessedBeat = _beatAccumulator;
+
+        RunHighPrecisionInternal(stopwatch, lastProcessedBeat);
+    }
+
+    /// <summary>
+    /// Internal high-precision playback loop implementation.
+    /// </summary>
+    private void RunHighPrecisionInternal(Stopwatch stopwatch, double lastProcessedBeat)
+    {
+        // Create and configure high-resolution timer
+        InitializeHighResTimer();
+
         double lastBeatEventTime = 0;
         double beatEventInterval = 1.0 / 120.0; // ~120fps for beat events in high-precision mode
 
@@ -794,6 +1606,9 @@ public class Sequencer : IDisposable
                     nextBeat = _beatAccumulator;
                 }
 
+                // Handle arrangement loop region
+                nextBeat = HandleArrangementLoop(nextBeat);
+
                 // Process with finer granularity based on subdivision
                 if (nextBeat != lastProcessedBeat)
                 {
@@ -806,6 +1621,10 @@ public class Sequencer : IDisposable
                     {
                         pattern.Process(lastProcessedBeat, nextBeat, _bpm);
                     }
+
+                    // Process arrangement clips (AudioClips and MidiClips)
+                    ProcessArrangementClips(lastProcessedBeat, nextBeat);
+
                     lastProcessedBeat = nextBeat;
                 }
 
@@ -1130,6 +1949,13 @@ public class Sequencer : IDisposable
 
         Stop();
 
+        // Detach metronome if attached
+        if (_metronome != null && _metronome.IsAttachedToSequencer)
+        {
+            _metronome.DetachFromSequencer();
+        }
+        _metronome = null;
+
         // Dispose MIDI clock sync
         _midiClockSync?.Dispose();
         _midiClockSync = null;
@@ -1228,5 +2054,49 @@ public class TimeSignatureChangedEventArgs : EventArgs
         Bar = bar;
         OldTimeSignature = oldTimeSignature;
         NewTimeSignature = newTimeSignature;
+    }
+}
+
+/// <summary>
+/// Event arguments for audio clip events (start/end).
+/// </summary>
+public class AudioClipEventArgs : EventArgs
+{
+    /// <summary>The audio clip associated with this event.</summary>
+    public AudioClip Clip { get; }
+
+    /// <summary>The beat position when the event occurred.</summary>
+    public double BeatPosition { get; }
+
+    /// <summary>The time when the event occurred.</summary>
+    public DateTime Timestamp { get; }
+
+    public AudioClipEventArgs(AudioClip clip, double beatPosition)
+    {
+        Clip = clip ?? throw new ArgumentNullException(nameof(clip));
+        BeatPosition = beatPosition;
+        Timestamp = DateTime.UtcNow;
+    }
+}
+
+/// <summary>
+/// Event arguments for MIDI clip events (start/end).
+/// </summary>
+public class MidiClipEventArgs : EventArgs
+{
+    /// <summary>The MIDI clip associated with this event.</summary>
+    public MidiClip Clip { get; }
+
+    /// <summary>The beat position when the event occurred.</summary>
+    public double BeatPosition { get; }
+
+    /// <summary>The time when the event occurred.</summary>
+    public DateTime Timestamp { get; }
+
+    public MidiClipEventArgs(MidiClip clip, double beatPosition)
+    {
+        Clip = clip ?? throw new ArgumentNullException(nameof(clip));
+        BeatPosition = beatPosition;
+        Timestamp = DateTime.UtcNow;
     }
 }
