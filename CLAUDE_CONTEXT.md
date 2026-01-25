@@ -171,15 +171,15 @@ sequencer.Start();
 | VectorSynth | XY Pad Crossfade |
 | NoiseGenerator | 5 Noise Types |
 
-### Effects (45+)
+### Effects (46+)
 | Kategorie | Effects |
 |-----------|---------|
 | Dynamics | Compressor, MultibandCompressor, SideChain, Gate, Limiter, TransientShaper, DeEsser, DynamicEQ, SpectralGate |
 | Time-Based | Reverb, EnhancedReverb, ConvolutionReverb, ShimmerReverb, ReverseReverb, Delay |
 | Modulation | Chorus, Flanger, Phaser, Tremolo, Vibrato, AutoPan |
-| Distortion | Distortion, Bitcrusher, TapeSaturation, HarmonicEnhancer (NEW) |
+| Distortion | Distortion, Bitcrusher, TapeSaturation, HarmonicEnhancer |
 | Filters | Filter, ParametricEQ |
-| Special | Exciter, StereoWidener, Vocoder, RingModulator, TapeStop, PitchShifter, SubBassGenerator (NEW), Dither (NEW) |
+| Special | Exciter, StereoWidener, Vocoder, RingModulator, TapeStop, PitchShifter, SubBassGenerator, Dither, SampleRateConverter (NEW) |
 
 ### MIDI & Sequencing
 | Feature | Beschreibung |
@@ -200,6 +200,7 @@ sequencer.Start();
 | ChordDetection | Real-time |
 | KeyDetection | Krumhansl-Schmuckler |
 | Dithering | RPDF/TPDF/HP-TPDF, Noise Shaping |
+| SampleRateConverter (NEW) | Linear/Cubic/Sinc interpolation, Anti-aliasing |
 
 ### Advanced Features
 | Feature | Beschreibung |
