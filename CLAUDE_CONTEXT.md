@@ -104,6 +104,7 @@ MusicEngineEditor: 0 Fehler, ~20 Warnungen
 ## Code Quality Fixes (Januar 2026)
 Die folgenden kritischen Probleme wurden behoben:
 
+### Thread-Safety Fixes
 1. **PolySynth.cs** - Thread-safe Random für Noise-Waveform
    - `new Random()` in Hot-Path entfernt
    - ThreadStatic Random eingeführt (keine Allocations im Audio-Thread)
@@ -117,6 +118,20 @@ Die folgenden kritischen Probleme wurden behoben:
 
 4. **OggVorbisEncoder.cs** - Thread-safe Random für Stream-ID
    - Statische Random-Instanz mit Lock
+
+### Memory Leak & Exception Handling Fixes
+5. **AudioEngine.cs** - StartInputCapture() Memory Leak Fix
+   - Cleanup bei Exceptions (waveIn?.Dispose(), Handler-Dictionaries bereinigt)
+   - Event-Handler werden erst nach erfolgreicher Initialisierung registriert
+
+6. **AudioEngine.cs** - Robustes Dispose Pattern
+   - `_disposed` Flag verhindert doppeltes Dispose
+   - Try-Catch um alle Dispose-Aufrufe
+   - Logging bei Dispose-Fehlern
+
+7. **EffectChain.cs** - GetVstEffects() als IEnumerable
+   - Keine List-Allokation mehr bei jedem Aufruf
+   - yield return Pattern für lazy evaluation
 
 ## Wichtige Konventionen
 
@@ -237,6 +252,15 @@ sequencer.Start();
 | NetworkMIDI (NEW) | RTP-MIDI Style, TCP/UDP, Peer Discovery, Latency Compensation |
 | CloudStorage (NEW) | Provider Abstraction, Auto-Sync, Offline Queue, Conflict Resolution |
 | Collaboration (NEW) | Real-time Multi-User, OT Algorithm, TCP Server/Client, Vector Clocks |
+
+### Editor UI Features (Januar 2026)
+| Feature | Beschreibung |
+|---------|--------------|
+| Note Velocity Colors | Blue→Green→Red Gradient basierend auf Velocity (0-127) |
+| Grid Customization | Triplet (1/4T, 1/8T, 1/16T) und Dotted (1/4., 1/8., 1/16.) mit visueller Unterscheidung |
+| Command Palette | Ctrl+P für schnellen Zugriff auf alle Befehle (Fuzzy Search) |
+| Drag & Drop Audio | Audio-Dateien direkt in Arrangement ziehen (WAV, MP3, FLAC, OGG, AIFF) |
+| LUFS Meter | Integrated/Short-term/Momentary Loudness + True Peak im Mixer |
 
 ---
 
