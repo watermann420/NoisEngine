@@ -19,7 +19,6 @@
 |-----------|--------|---------|
 | **MusicEngine** | 50% Complete | 100+ effects, 45+ synthesizers, VST2/VST3/CLAP hosting |
 | **MusicEngineEditor** | 50% Complete | 189+ UI features, full WPF desktop application |
-| **Unit Tests** | 774 tests | 760 passed, 14 pre-existing failures |
 | **Build** | 0 Errors | Clean builds with minimal warnings |
 
 ## Multiple Function Aliases
