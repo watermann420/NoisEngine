@@ -8,7 +8,6 @@
 ![C#](https://img.shields.io/badge/language-C%23-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-purple)
 ![Status](https://img.shields.io/badge/status-Work_in_Progress-orange)
-![Tests](https://img.shields.io/badge/tests-774_passing-brightgreen)
 ![Effects](https://img.shields.io/badge/effects-100+-blue)
 ![Synths](https://img.shields.io/badge/synthesizers-45+-blue)
 
