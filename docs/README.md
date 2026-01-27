@@ -8,7 +8,7 @@
 ![C#](https://img.shields.io/badge/language-C%23-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-purple)
 ![Status](https://img.shields.io/badge/status-Work_in_Progress-orange)
-![Effects](https://img.shields.io/badge/effects-100+-blue)
+![Effects](https://img.shields.io/badge/effects-1000+-blue)
 ![Synths](https://img.shields.io/badge/synthesizers-45+-blue)
 
 **Music Engine** is a modular, open-source live-coding music engine written in C#. It combines code, MIDI, patterns, and real-time audio to enable flexible music production, live performance, and interactive audio programming.
@@ -17,7 +17,7 @@
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **MusicEngine** | 50% Complete | 100+ effects, 45+ synthesizers, VST2/VST3/CLAP hosting |
+| **MusicEngine** | 50% Complete | 1000+ effects, 45+ synthesizers, VST2/VST3/CLAP hosting |
 | **MusicEngineEditor** | 50% Complete | 189+ UI features, full WPF desktop application |
 | **Build** | 0 Errors | Clean builds with minimal warnings |
 
@@ -60,7 +60,7 @@ Use whatever feels natural to you - all aliases are fully supported!
 MusicEngine provides a complete audio production framework with:
 
 - **45+ Synthesizers** including FM, Granular, Wavetable, Physical Modeling, Additive, Modular, and more
-- **100+ Professional Effects** across dynamics, time-based, modulation, distortion, restoration, and AI/ML categories
+- **1000+ Effects** across dynamics, time-based, modulation, distortion, restoration, and AI/ML categories
 - **VST2/VST3/CLAP plugin hosting** with full COM interfaces and Plugin Delay Compensation
 - **128 General MIDI instruments** via Windows built-in synthesizer
 - Pattern-based sequencing with Arrangement, AudioClip, MidiClip support
@@ -105,7 +105,7 @@ Git: https://github.com/watermann420/MusicEngineEditor
 | **Retro** | ChipTuneSynth (NES/GameBoy/C64) |
 | **Other** | WavefolderSynth, SubtractiveSynth, BellSynth, OrganSynth, StringSynth, LeadSynth, BassSynth, PluckSynth |
 
-### Effects (100+)
+### Effects (1000+)
 
 | Category | Effects |
 |----------|---------|
