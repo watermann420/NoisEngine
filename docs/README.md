@@ -105,7 +105,7 @@ Git: https://github.com/watermann420/MusicEngineEditor
 | **Retro** | ChipTuneSynth (NES/GameBoy/C64) |
 | **Other** | WavefolderSynth, SubtractiveSynth, BellSynth, OrganSynth, StringSynth, LeadSynth, BassSynth, PluckSynth |
 
-### Effects (100+)
+### Effects (1000+)
 
 | Category | Effects |
 |----------|---------|
