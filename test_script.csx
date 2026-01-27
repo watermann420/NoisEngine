@@ -107,11 +107,11 @@ midi.device(0).route(synth);
 
 
 // OPTIONAL: PLAY A PATTERN
-var playPattern = false;
+var playPattern = true;
 
 if (playPattern)
 {
-    var pattern = CreatePattern();
+    var pattern = CreatePattern(synth);
     pattern.LoopLength = 4.0;
 
     // Add some notes
