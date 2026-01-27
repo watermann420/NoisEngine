@@ -60,7 +60,7 @@ Use whatever feels natural to you - all aliases are fully supported!
 MusicEngine provides a complete audio production framework with:
 
 - **45+ Synthesizers** including FM, Granular, Wavetable, Physical Modeling, Additive, Modular, and more
-- **100+ Professional Effects** across dynamics, time-based, modulation, distortion, restoration, and AI/ML categories
+- **1000+ Effects** across dynamics, time-based, modulation, distortion, restoration, and AI/ML categories
 - **VST2/VST3/CLAP plugin hosting** with full COM interfaces and Plugin Delay Compensation
 - **128 General MIDI instruments** via Windows built-in synthesizer
 - Pattern-based sequencing with Arrangement, AudioClip, MidiClip support
