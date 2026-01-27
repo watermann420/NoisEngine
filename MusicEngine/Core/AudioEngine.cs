@@ -317,13 +317,60 @@ public class AudioEngine : IDisposable
                 EventHandler<MidiInMessageEventArgs> midiHandler = (s, e) => {
                     if (e.MidiEvent is ControlChangeEvent ccEvent) // Handle Control Change events
                     {
+                        float normalizedValue = ccEvent.ControllerValue / 127f;
+
+                        // Auto-route common CCs to routed synth
+                        ISynth? ccRoutedSynth = null;
+                        lock (_midiInputRouting)
+                        {
+                            _midiInputRouting.TryGetValue(deviceIndex, out ccRoutedSynth);
+                        }
+                        if (ccRoutedSynth != null)
+                        {
+                            // CC#1 = Mod Wheel
+                            if ((int)ccEvent.Controller == 1)
+                            {
+                                ccRoutedSynth.SetParameter("modwheel", normalizedValue);
+                            }
+                            // CC#7 = Volume
+                            else if ((int)ccEvent.Controller == 7)
+                            {
+                                ccRoutedSynth.SetParameter("volume", normalizedValue);
+                            }
+                            // CC#10 = Pan
+                            else if ((int)ccEvent.Controller == 10)
+                            {
+                                ccRoutedSynth.SetParameter("pan", normalizedValue * 2f - 1f); // Convert 0-1 to -1 to +1
+                            }
+                            // CC#74 = Filter Cutoff (often used on synths)
+                            else if ((int)ccEvent.Controller == 74)
+                            {
+                                ccRoutedSynth.SetParameter("cutoff", normalizedValue);
+                            }
+                            // CC#71 = Resonance
+                            else if ((int)ccEvent.Controller == 71)
+                            {
+                                ccRoutedSynth.SetParameter("resonance", normalizedValue);
+                            }
+                            // CC#73 = Attack
+                            else if ((int)ccEvent.Controller == 73)
+                            {
+                                ccRoutedSynth.SetParameter("attack", normalizedValue * 2f); // 0-2 seconds
+                            }
+                            // CC#72 = Release
+                            else if ((int)ccEvent.Controller == 72)
+                            {
+                                ccRoutedSynth.SetParameter("release", normalizedValue * 2f); // 0-2 seconds
+                            }
+                        }
+
                         lock (_midiMappings) // Lock for thread safety
                         {
                             foreach (var mapping in _midiMappings) // Iterate mappings
                             {
                                 if (mapping.deviceIndex == deviceIndex && mapping.control == (int)ccEvent.Controller) // Match device and control
                                 {
-                                    mapping.synth.SetParameter(mapping.parameter, ccEvent.ControllerValue / 127f); // Normalize and set parameter
+                                    mapping.synth.SetParameter(mapping.parameter, normalizedValue); // Set parameter
                                 }
                             }
                         }
@@ -334,7 +381,7 @@ public class AudioEngine : IDisposable
                             {
                                 if (mapping.deviceIndex == deviceIndex && mapping.command == ((int)ccEvent.Controller).ToString()) // Match device and command
                                 {
-                                    mapping.action(ccEvent.ControllerValue / 127f); // Normalize and invoke action
+                                    mapping.action(normalizedValue); // Invoke action
                                 }
                             }
                         }
@@ -342,14 +389,29 @@ public class AudioEngine : IDisposable
 
                     if (e.MidiEvent is PitchWheelChangeEvent pitchEvent) // Handle Pitch Bend events
                     {
+                        // Normalize pitch bend: 0-16383 where 8192 is center
+                        // Convert to -1 to +1 range for synth PitchBend property
+                        float normalizedBipolar = (pitchEvent.Pitch - 8192) / 8192f;
+                        float normalizedUnipolar = pitchEvent.Pitch / 16383f;
+
+                        // Send to routed synth automatically
+                        ISynth? pitchRoutedSynth = null;
+                        lock (_midiInputRouting)
+                        {
+                            _midiInputRouting.TryGetValue(deviceIndex, out pitchRoutedSynth);
+                        }
+                        if (pitchRoutedSynth != null)
+                        {
+                            pitchRoutedSynth.SetParameter("pitchbend", normalizedBipolar);
+                        }
+
                         lock (_midiMappings) // Lock for thread safety
                         {
                             foreach (var mapping in _midiMappings) // Iterate mappings
                             {
                                 if (mapping.deviceIndex == deviceIndex && mapping.control == -1) // Use -1 to denote pitch bend
                                 {
-                                    float normalizedValue = pitchEvent.Pitch / 16383f; // Normalize pitch bend value
-                                    mapping.synth.SetParameter(mapping.parameter, normalizedValue); // Set parameter
+                                    mapping.synth.SetParameter(mapping.parameter, normalizedUnipolar); // Set parameter
                                 }
                             }
                         }
@@ -360,7 +422,7 @@ public class AudioEngine : IDisposable
                             {
                                 if (mapping.deviceIndex == deviceIndex && mapping.command == "pitch") // Match pitch command
                                 {
-                                    mapping.action(pitchEvent.Pitch / 16383f); // Normalize and invoke action
+                                    mapping.action(normalizedUnipolar); // Invoke action
                                 }
                             }
                         }
