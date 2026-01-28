@@ -7,7 +7,7 @@ audio.all.gain(0.3); // Master volume
 var synth = CreateSynth();
 
 // OSCILLATOR 1 SETTINGS
-synth.Waveform = WaveType.Sawtooth;  // Sine, Square, Sawtooth, Triangle, Pulse, Noise
+synth.Waveform = WaveType.Square;  // Sine, Square, Sawtooth, Triangle, Pulse, Noise
 synth.Osc1Octave = 0;                // Octave offset: -3 to +3
 synth.Osc1Semi = 0;                  // Semitone detune: -12 to +12
 synth.Osc1Fine = 0f;                 // Fine tune in cents: -100 to +100
@@ -24,20 +24,20 @@ synth.Osc2Level = 0.5f;             // Volume: 0 to 1
 synth.Osc2PulseWidth = 0.5f;        // Pulse width (for Pulse wave): 0.1 to 0.9
 
 // SUB OSCILLATOR & NOISE
-synth.SubOscLevel = 0.0f;            // Sub oscillator (1 octave down): 0 to 1
+synth.SubOscLevel = 0.9f;            // Sub oscillator (1 octave down): 0 to 1
 synth.SubOscWaveform = WaveType.Sine; // Sine or Square work best
 synth.NoiseLevel = 0.0f;             // White noise: 0 to 1
 
 // FILTER SETTINGS
-synth.Cutoff = 0.6f;                 // Filter cutoff: 0 to 1 (maps to 20-20000 Hz)
+synth.Cutoff = 0.9f;                 // Filter cutoff: 0 to 1 (maps to 20-20000 Hz)
 synth.Resonance = 0.3f;              // Resonance/Q: 0 to 1
-synth.FilterEnvAmount = 0.4f;        // Envelope to filter: -1 to +1
+synth.FilterEnvAmount = 0.0f;        // Envelope to filter: -1 to +1
 synth.FilterKeyTrack = 0.5f;         // Keyboard tracking: 0 to 1
 synth.FilterDrive = 0.0f;            // Filter saturation: 0 to 1
 
 // AMPLITUDE ENVELOPE (ADSR)
-synth.Attack = 0.01f;                // Attack time in seconds: 0.001 to 10
-synth.Decay = 0.2f;                  // Decay time: 0.001 to 10
+synth.Attack = 0.001f;                // Attack time in seconds: 0.001 to 10
+synth.Decay = 0.02f;                  // Decay time: 0.001 to 10
 synth.Sustain = 0.7f;                // Sustain level: 0 to 1
 synth.Release = 0.3f;                // Release time: 0.001 to 10
 
@@ -61,7 +61,7 @@ synth.PitchBendRange = 2;            // Pitch bend range in semitones: 1 to 24
 // synth.PitchBend = 0.0f;           // Current pitch bend value: -1 to +1 (set by MIDI wheel)
 
 // MOD WHEEL (CC#1 is auto-routed)
-synth.VibratoRate = 5.0f;            // Vibrato speed (mod wheel controls depth): 0.1 to 20 Hz
+synth.VibratoRate = 20.0f;            // Vibrato speed (mod wheel controls depth): 0.1 to 20 Hz
 synth.VibratoDepth = 0.3f;           // Max vibrato depth (semitones): 0 to 2
 // synth.ModWheel = 0.0f;            // Current mod wheel value: 0 to 1 (set by MIDI CC#1)
 
