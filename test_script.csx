@@ -111,7 +111,7 @@ var playPattern = true;
 
 if (playPattern)
 {
-    var pattern = CreatePattern(synth);
+    var pattern = CreatePattern();
     pattern.LoopLength = 4.0;
 
     // Add some notes

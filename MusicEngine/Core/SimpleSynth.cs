@@ -554,6 +554,10 @@ public class SimpleSynth : ISynth
             mixL *= Volume * panL;
             mixR *= Volume * panR;
 
+            // Soft-clip to prevent harsh digital clipping (causes pops)
+            mixL = SoftClip(mixL);
+            mixR = SoftClip(mixR);
+
             // Write to buffer
             int idx = offset + s * channels;
             buffer[idx] = mixL;
@@ -578,6 +582,20 @@ public class SimpleSynth : ISynth
             WaveType.Noise => 0f, // Handled separately with random
             _ => 0f
         };
+    }
+
+    /// <summary>
+    /// Soft-clip function to prevent harsh digital clipping.
+    /// Uses tanh for smooth saturation above threshold.
+    /// </summary>
+    private static float SoftClip(float x)
+    {
+        const float threshold = 0.8f;
+        if (x > threshold)
+            return threshold + (1f - threshold) * (float)Math.Tanh((x - threshold) / (1f - threshold));
+        if (x < -threshold)
+            return -threshold - (1f - threshold) * (float)Math.Tanh((-x - threshold) / (1f - threshold));
+        return x;
     }
 
     /// <summary>
@@ -609,9 +627,13 @@ public class SimpleSynth : ISynth
         private int _ampStage; // 0=attack, 1=decay, 2=sustain, 3=release
         private int _filterStage;
 
-        // Filter state (2-pole)
-        private float _filterState1;
-        private float _filterState2;
+        // Filter state (stereo one-pole lowpass)
+        private float _filterState1; // Left channel
+        private float _filterState2; // Right channel
+
+        // Anti-click ramp for voice start
+        private float _startRamp;
+        private const float StartRampRate = 0.0005f; // ~2ms ramp at 44.1kHz (smoother)
 
         private readonly Random _random = new();
 
@@ -636,8 +658,15 @@ public class SimpleSynth : ISynth
             _velocity = velocity;
             _ampStage = 0;
             _filterStage = 0;
-            _ampEnv = 0;
-            _filterEnv = 0;
+            // Keep current envelope values for smooth retrigger (no click)
+            // The attack phase will rise from current level, not from 0
+            // Only reset if envelope is nearly silent
+            if (_ampEnv < 0.01f)
+            {
+                _ampEnv = 0;
+                _filterEnv = 0;
+            }
+            // Don't reset filter state - keeps continuity
         }
 
         public void TriggerRelease()
@@ -682,11 +711,12 @@ public class SimpleSynth : ISynth
             {
                 float detuneCents = _unisonDetunes[u] * synth.UnisonDetune;
                 float detuneRatio = (float)Math.Pow(2, detuneCents / 1200f);
+                float osc1PhaseInc = freq1 * detuneRatio / sampleRate;
 
-                // Oscillator 1
+                // Oscillator 1 with band-limiting
                 float pw1 = Math.Clamp(synth.Osc1PulseWidth + pwMod, 0.1f, 0.9f);
-                float osc1 = GenerateOsc(synth.Waveform, _unisonPhases[u], pw1, _random) * synth.Osc1Level;
-                _unisonPhases[u] += freq1 * detuneRatio / sampleRate;
+                float osc1 = GenerateOsc(synth.Waveform, _unisonPhases[u], pw1, _random, osc1PhaseInc) * synth.Osc1Level;
+                _unisonPhases[u] += osc1PhaseInc;
                 if (_unisonPhases[u] >= 1f) _unisonPhases[u] -= 1f;
 
                 // Calculate stereo position for unison
@@ -698,23 +728,25 @@ public class SimpleSynth : ISynth
                 signalR += osc1 * panR * unisonGain;
             }
 
-            // Oscillator 2 (without unison for CPU efficiency)
+            // Oscillator 2 with band-limiting
             if (synth.Osc2Enabled)
             {
+                float osc2PhaseInc = freq2 / sampleRate;
                 float pw2 = Math.Clamp(synth.Osc2PulseWidth + pwMod, 0.1f, 0.9f);
-                float osc2 = GenerateOsc(synth.Osc2Waveform, _osc2Phase, pw2, _random) * synth.Osc2Level;
-                _osc2Phase += freq2 / sampleRate;
+                float osc2 = GenerateOsc(synth.Osc2Waveform, _osc2Phase, pw2, _random, osc2PhaseInc) * synth.Osc2Level;
+                _osc2Phase += osc2PhaseInc;
                 if (_osc2Phase >= 1f) _osc2Phase -= 1f;
 
                 signalL += osc2;
                 signalR += osc2;
             }
 
-            // Sub oscillator
+            // Sub oscillator with band-limiting
             if (synth.SubOscLevel > 0)
             {
-                float sub = GenerateOsc(synth.SubOscWaveform, _subPhase, 0.5f, _random) * synth.SubOscLevel;
-                _subPhase += subFreq / sampleRate;
+                float subPhaseInc = subFreq / sampleRate;
+                float sub = GenerateOsc(synth.SubOscWaveform, _subPhase, 0.5f, _random, subPhaseInc) * synth.SubOscLevel;
+                _subPhase += subPhaseInc;
                 if (_subPhase >= 1f) _subPhase -= 1f;
 
                 signalL += sub;
@@ -728,9 +760,6 @@ public class SimpleSynth : ISynth
                 signalL += noise;
                 signalR += noise;
             }
-
-            // Mix to mono for filter
-            signal = (signalL + signalR) * 0.5f;
 
             // Process envelopes
             _ampEnv = ProcessEnvelope(_ampStage, _ampEnv, synth.Attack, synth.Decay, synth.Sustain, synth.Release, sampleRate, ref _ampStage);
@@ -748,83 +777,152 @@ public class SimpleSynth : ISynth
             float keyTrack = (Note - 60) / 60f * synth.FilterKeyTrack;
             float envMod = _filterEnv * synth.FilterEnvAmount;
             float cutoffHz = baseCutoff * (float)Math.Pow(2, keyTrack + envMod * 4 + filterMod * 2);
-            cutoffHz = Math.Clamp(cutoffHz, 20f, 20000f);
+            cutoffHz = Math.Clamp(cutoffHz, 20f, Math.Min(20000f, sampleRate * 0.45f));
 
-            // 2-pole low-pass filter with resonance
-            float w = 2f * (float)Math.PI * cutoffHz / sampleRate;
-            float cosW = (float)Math.Cos(w);
-            float alpha = (float)Math.Sin(w) / (2f * (1.1f - synth.Resonance * 0.9f));
+            // Simple but stable one-pole lowpass filter
+            // This avoids the instability issues of higher-order filters
+            float rc = 1f / (2f * (float)Math.PI * cutoffHz);
+            float dt = 1f / sampleRate;
+            float filterAlpha = dt / (rc + dt);
 
-            // Apply filter drive
+            // Add resonance as gentle feedback
+            float resonanceBoost = 1f + synth.Resonance * 2f;
+
+            // Apply filter drive before filtering
             if (synth.FilterDrive > 0)
             {
-                signal = (float)Math.Tanh(signal * (1f + synth.FilterDrive * 4f));
+                signalL = (float)Math.Tanh(signalL * (1f + synth.FilterDrive * 3f));
+                signalR = (float)Math.Tanh(signalR * (1f + synth.FilterDrive * 3f));
             }
 
-            // Simple 2-pole filter
-            float filterW = Math.Min(cutoffHz / sampleRate, 0.45f);
-            float fb = synth.Resonance + synth.Resonance / (1f - filterW);
-            _filterState1 += filterW * (signal - _filterState1 + fb * (_filterState1 - _filterState2));
-            _filterState2 += filterW * (_filterState1 - _filterState2);
-            signal = _filterState2;
+            // Filter left channel
+            _filterState1 += filterAlpha * (signalL * resonanceBoost - _filterState1);
+            signalL = _filterState1;
+
+            // Filter right channel
+            _filterState2 += filterAlpha * (signalR * resonanceBoost - _filterState2);
+            signalR = _filterState2;
 
             // Apply amplitude envelope and velocity
-            signal *= _ampEnv * _velocity;
+            float ampMult = _ampEnv * _velocity;
+            signalL *= ampMult;
+            signalR *= ampMult;
 
-            // Stereo output
-            float outL = signal;
-            float outR = signal;
+            // Apply anti-click start ramp
+            if (_startRamp < 1f)
+            {
+                _startRamp = Math.Min(1f, _startRamp + StartRampRate);
+                signalL *= _startRamp;
+                signalR *= _startRamp;
+            }
 
-            return (outL, outR);
+            return (signalL, signalR);
         }
 
-        private static float GenerateOsc(WaveType type, float phase, float pulseWidth, Random random)
+        // PolyBLEP for anti-aliased waveforms
+        private static float PolyBlep(float t, float dt)
         {
-            return type switch
+            // t = phase position, dt = phase increment (freq/sampleRate)
+            if (t < dt)
             {
-                WaveType.Sine => (float)Math.Sin(phase * Math.PI * 2),
-                WaveType.Square => phase < 0.5f ? 0.9f : -0.9f,
-                WaveType.Sawtooth => 2f * phase - 1f,
-                WaveType.Triangle => phase < 0.5f ? 4f * phase - 1f : 3f - 4f * phase,
-                WaveType.Pulse => phase < pulseWidth ? 0.9f : -0.9f,
-                WaveType.Noise => (float)random.NextDouble() * 2f - 1f,
-                _ => 0f
-            };
+                t /= dt;
+                return t + t - t * t - 1f;
+            }
+            else if (t > 1f - dt)
+            {
+                t = (t - 1f) / dt;
+                return t * t + t + t + 1f;
+            }
+            return 0f;
+        }
+
+        private float _lastPhase; // Track for PolyBLEP
+
+        private float GenerateOsc(WaveType type, float phase, float pulseWidth, Random random, float phaseInc)
+        {
+            float sample;
+            float dt = phaseInc; // Normalized frequency
+
+            switch (type)
+            {
+                case WaveType.Sine:
+                    sample = (float)Math.Sin(phase * Math.PI * 2);
+                    break;
+
+                case WaveType.Sawtooth:
+                    // Band-limited sawtooth using PolyBLEP
+                    sample = 2f * phase - 1f;
+                    sample -= PolyBlep(phase, dt);
+                    break;
+
+                case WaveType.Square:
+                    // Band-limited square using PolyBLEP
+                    sample = phase < 0.5f ? 0.9f : -0.9f;
+                    sample += PolyBlep(phase, dt);
+                    sample -= PolyBlep((phase + 0.5f) % 1f, dt);
+                    break;
+
+                case WaveType.Pulse:
+                    // Band-limited pulse using PolyBLEP
+                    sample = phase < pulseWidth ? 0.9f : -0.9f;
+                    sample += PolyBlep(phase, dt);
+                    sample -= PolyBlep((phase + (1f - pulseWidth)) % 1f, dt);
+                    break;
+
+                case WaveType.Triangle:
+                    // Triangle derived from integrated square (naturally band-limited)
+                    sample = phase < 0.5f ? 4f * phase - 1f : 3f - 4f * phase;
+                    break;
+
+                case WaveType.Noise:
+                    sample = (float)random.NextDouble() * 2f - 1f;
+                    break;
+
+                default:
+                    sample = 0f;
+                    break;
+            }
+
+            return sample;
         }
 
         private static float ProcessEnvelope(int stage, float current, float attack, float decay,
             float sustain, float release, int sampleRate, ref int stageRef)
         {
-            float rate;
+            // Use exponential curves for natural-sounding envelopes
+            // This prevents clicks and pops at transitions
+            const float expCoeff = 0.0001f; // Controls curve steepness
+
             switch (stage)
             {
-                case 0: // Attack
-                    rate = 1f / (Math.Max(attack, 0.001f) * sampleRate);
-                    current += rate;
-                    if (current >= 1f)
+                case 0: // Attack - exponential rise (fast start, slow finish)
+                    float attackRate = 1f / (Math.Max(attack, 0.002f) * sampleRate);
+                    // Asymptotic approach to 1.0 - never overshoots
+                    current += attackRate * (1.01f - current);
+                    if (current >= 0.999f)
                     {
                         current = 1f;
                         stageRef = 1;
                     }
                     break;
 
-                case 1: // Decay
-                    rate = 1f / (Math.Max(decay, 0.001f) * sampleRate);
-                    current -= rate * (current - sustain);
-                    if (current <= sustain + 0.001f)
+                case 1: // Decay - exponential fall to sustain
+                    float decayRate = 1f / (Math.Max(decay, 0.002f) * sampleRate);
+                    current += decayRate * (sustain - current);
+                    if (Math.Abs(current - sustain) < 0.001f)
                     {
                         current = sustain;
                         stageRef = 2;
                     }
                     break;
 
-                case 2: // Sustain
+                case 2: // Sustain - hold at sustain level
                     current = sustain;
                     break;
 
-                case 3: // Release
-                    rate = 1f / (Math.Max(release, 0.001f) * sampleRate);
-                    current *= (1f - rate);
+                case 3: // Release - exponential fall to zero
+                    float releaseRate = 1f / (Math.Max(release, 0.002f) * sampleRate);
+                    current += releaseRate * (0f - current);
                     if (current <= 0.0001f)
                     {
                         current = 0f;
