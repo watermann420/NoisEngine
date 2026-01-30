@@ -22,7 +22,7 @@ https://youtu.be/t9kZqpMVdsQ
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **MusicEngine** | 50% Complete | 100+ effects, 45+ synthesizers, VST2/VST3/CLAP hosting |
+| **MusicEngine** | 50% Complete | 1000+ effects, 45+ synthesizers, VST2/VST3/CLAP hosting |
 | **MusicEngineEditor** | 50% Complete | 215+ UI features, full WPF desktop application |
 
 
