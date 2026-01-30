@@ -56,7 +56,6 @@ synth.LfoToAmp = 0.0f;               // LFO to amplitude (tremolo): 0 to 1
 synth.LfoToPulseWidth = 0.0f;        // LFO to pulse width: 0 to 0.4
 
 // PITCH BEND & MODULATION
-// PitchBend is automatically received from your MIDI controller's pitch wheel!
 synth.PitchBendRange = 2;            // Pitch bend range in semitones: 1 to 24
 // synth.PitchBend = 0.0f;           // Current pitch bend value: -1 to +1 (set by MIDI wheel)
 

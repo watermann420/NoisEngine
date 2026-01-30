@@ -178,7 +178,7 @@ public class Pattern
 
             if (trigger)
             {
-                TriggerNote(ev, noteIndex, endBeat, cycleNumber, bpm);
+                TriggerNote(ev, noteIndex, endBeat, cycleNumber, bpm); // Trigger the note
             }
         }
     }
@@ -189,35 +189,35 @@ public class Pattern
     private void TriggerNote(NoteEvent ev, int noteIndex, double absoluteBeat, int cycleNumber, double bpm)
     {
         // Create the musical event with full information
-        var durationMs = ev.Duration * (60000.0 / bpm);
-        var now = DateTime.Now;
+        var durationMs = ev.Duration * (60000.0 / bpm); // Convert duration from beats to milliseconds
+        var now = DateTime.Now; // Current time for scheduling
 
         var musicalEvent = new MusicalEvent
         {
-            Id = new EventId(PatternIndex, noteIndex),
-            SourcePattern = this,
-            NoteEvent = ev,
-            Note = ev.Note,
-            NoteName = MusicalEvent.GetNoteName(ev.Note),
-            Velocity = ev.Velocity,
-            Duration = ev.Duration,
-            CyclePosition = ev.Beat,
-            AbsoluteBeat = absoluteBeat,
-            CycleNumber = cycleNumber,
-            LoopLength = LoopLength,
-            InstrumentName = !string.IsNullOrEmpty(InstrumentName) ? InstrumentName : $"Pattern {PatternIndex}",
-            SourceInfo = ev.SourceInfo ?? SourceInfo,
-            TriggeredAt = now,
-            EndsAt = now.AddMilliseconds(durationMs),
-            IsNoteOn = true,
-            Bpm = bpm
+            Id = new EventId(PatternIndex, noteIndex), // Unique ID for this event
+            SourcePattern = this, // Reference to the source pattern
+            NoteEvent = ev, // Original note event
+            Note = ev.Note, // MIDI note number
+            NoteName = MusicalEvent.GetNoteName(ev.Note), // Note name (e.g., C4)
+            Velocity = ev.Velocity, // Velocity
+            Duration = ev.Duration, // Duration in beats
+            CyclePosition = ev.Beat, // Position within the cycle
+            AbsoluteBeat = absoluteBeat, // Absolute beat in the sequencer
+            CycleNumber = cycleNumber, // Cycle iteration number
+            LoopLength = LoopLength, // Loop length in beats
+            InstrumentName = !string.IsNullOrEmpty(InstrumentName) ? InstrumentName : $"Pattern {PatternIndex}", // Instrument name
+            SourceInfo = ev.SourceInfo ?? SourceInfo, // Source code info
+            TriggeredAt = now, // Time when triggered
+            EndsAt = now.AddMilliseconds(durationMs), // Scheduled end time
+            IsNoteOn = true, // Note-on event
+            Bpm = bpm // Current BPM
         };
 
         // Notify sequencer of the event
-        Sequencer?.OnNoteTriggered(musicalEvent);
+        Sequencer?.OnNoteTriggered(musicalEvent); // Notify sequencer
 
         // Trigger the note on the synth
-        Synth.NoteOn(ev.Note, ev.Velocity);
+        Synth.NoteOn(ev.Note, ev.Velocity); // Note on
 
         // Schedule note off with high-precision timing
         // Task.Delay has ~15ms resolution on Windows which causes audible gaps/overlaps.
