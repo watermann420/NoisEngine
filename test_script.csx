@@ -29,23 +29,23 @@ synth.SubOscWaveform = WaveType.Sine; // Sine or Square work best
 synth.NoiseLevel = 0.0f;             // White noise: 0 to 1
 
 // FILTER SETTINGS
-synth.Cutoff = 0.9f;                 // Filter cutoff: 0 to 1 (maps to 20-20000 Hz)
-synth.Resonance = 0.3f;              // Resonance/Q: 0 to 1
+synth.Cutoff = 1f;                 // Filter cutoff: 0 to 1 (maps to 20-20000 Hz)
+synth.Resonance = 0.5f;              // Resonance/Q: 0 to 1
 synth.FilterEnvAmount = 0.0f;        // Envelope to filter: -1 to +1
 synth.FilterKeyTrack = 0.5f;         // Keyboard tracking: 0 to 1
 synth.FilterDrive = 0.0f;            // Filter saturation: 0 to 1
 
 // AMPLITUDE ENVELOPE (ADSR)
-synth.Attack = 0.001f;                // Attack time in seconds: 0.001 to 10
-synth.Decay = 0.02f;                  // Decay time: 0.001 to 10
-synth.Sustain = 0.7f;                // Sustain level: 0 to 1
-synth.Release = 0.3f;                // Release time: 0.001 to 10
+synth.Attack = 0.01f;                // Attack time in seconds: 0.001 to 10
+synth.Decay = 0.01f;                  // Decay time: 0.001 to 10
+synth.Sustain = 0.2f;                // Sustain level: 0 to 1
+synth.Release = 0.08f;                // Release time: 0.001 to 10
 
 // FILTER ENVELOPE (ADSR)
 synth.FilterAttack = 0.01f;          // Filter envelope attack
-synth.FilterDecay = 0.3f;            // Filter envelope decay
-synth.FilterSustain = 0.3f;          // Filter envelope sustain
-synth.FilterRelease = 0.3f;          // Filter envelope release
+synth.FilterDecay = 0.03f;            // Filter envelope decay
+synth.FilterSustain = 0.03f;          // Filter envelope sustain
+synth.FilterRelease = 0.03f;          // Filter envelope release
 
 // LFO SETTINGS
 synth.LfoRate = 5.0f;                // LFO speed in Hz: 0.01 to 50
@@ -77,12 +77,12 @@ synth.UnisonSpread = 0.5f;           // Stereo spread: 0 to 1
 
 // Delay
 synth.DelayMix = 0.0f;               // Delay wet/dry mix: 0 to 1
-synth.DelayTime = 300f;              // Delay time in ms: 1 to 2000
+synth.DelayTime = 250f;              // Delay time in ms: 1 to 2000
 synth.DelayFeedback = 0.4f;          // Delay feedback: 0 to 0.95
 
 // Reverb
-synth.ReverbMix = 0.15f;             // Reverb wet/dry mix: 0 to 1
-synth.ReverbSize = 0.5f;             // Room size: 0 to 1
+synth.ReverbMix = 0f;             // Reverb wet/dry mix: 0 to 1
+synth.ReverbSize = 0.1f;             // Room size: 0 to 1
 synth.ReverbDamping = 0.5f;          // High frequency damping: 0 to 1
 
 // OUTPUT SETTINGS
@@ -140,7 +140,7 @@ var playTetris = true;  // Set to true to play
 if (playTetris)
 {
     var tetris = CreatePattern(synth);
-    tetris.LoopLength = 16.0;  
+    tetris.LoopLength = 16.0;
 
 
 
