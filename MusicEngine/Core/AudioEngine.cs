@@ -68,6 +68,12 @@ public class AudioEngine : IDisposable
     // Logging
     private readonly ILogger? _logger;
 
+    // Live activity events (for editor highlighting)
+    public event Action<int>? MidiActivity; // device index
+    public event Action<int, bool>? MidiNoteActivity; // device index, isOn
+    public event Action<string, float>? ParameterChanged; // parameter name, value
+    public event Action<string>? MidiLog; // formatted log line
+
     // Events for external subscribers
     public event EventHandler<ChannelEventArgs>? ChannelAdded;
     public event EventHandler<PluginEventArgs>? PluginLoaded;
@@ -108,6 +114,8 @@ public class AudioEngine : IDisposable
             _midiInputRouting[deviceIndex] = synth; // Route MIDI input to synth
         }
 
+        MidiLog?.Invoke($"[MIDI {deviceIndex}] routed to {synth.GetType().Name}");
+
         string? deviceName;
         lock (_midiInputNames)
         {
@@ -128,6 +136,7 @@ public class AudioEngine : IDisposable
             _midiLogEnabled[deviceIndex] = enabled;
         }
         _logger?.LogInformation("MIDI logging {State} for device {DeviceIndex}", enabled ? "enabled" : "disabled", deviceIndex);
+        MidiLog?.Invoke($"[MIDI {deviceIndex}] logging {(enabled ? "on" : "off")}");
     }
 
     /// <summary>
@@ -606,11 +615,13 @@ public class AudioEngine : IDisposable
         {
             Console.WriteLine(msg);
         }
+        MidiLog?.Invoke(msg);
     }
 
     private void HandleMidiMessage(int deviceIndex, MidiInMessageEventArgs e)
     {
         TryLogMidiEvent(deviceIndex, e);
+        MidiActivity?.Invoke(deviceIndex);
 
         switch (e.MidiEvent)
         {
@@ -621,6 +632,7 @@ public class AudioEngine : IDisposable
                 HandlePitchBend(deviceIndex, pitchEvent);
                 return;
             case NAudio.Midi.NoteEvent noteEvent:
+                MidiNoteActivity?.Invoke(deviceIndex, noteEvent.CommandCode == MidiCommandCode.NoteOn && noteEvent is NoteOnEvent on && on.Velocity > 0);
                 if (HandleNoteWithRanges(deviceIndex, noteEvent)) return;
                 var routedSynth = GetRoutedSynth(deviceIndex);
                 if (routedSynth != null)
@@ -671,6 +683,7 @@ public class AudioEngine : IDisposable
             case 73: synth.SetParameter("attack", normalizedValue * 2f); break;        // Attack 0-2s
             case 72: synth.SetParameter("release", normalizedValue * 2f); break;       // Release 0-2s
         }
+        ParameterChanged?.Invoke("cc", normalizedValue);
     }
 
     private void ApplyMappedCc(int deviceIndex, ControlChangeEvent ccEvent, float normalizedValue)
@@ -682,6 +695,7 @@ public class AudioEngine : IDisposable
                 if (mapping.deviceIndex == deviceIndex && mapping.control == (int)ccEvent.Controller)
                 {
                     mapping.synth.SetParameter(mapping.parameter, normalizedValue);
+                    ParameterChanged?.Invoke(mapping.parameter, normalizedValue);
                 }
             }
         }
@@ -708,6 +722,7 @@ public class AudioEngine : IDisposable
 
         var pitchRoutedSynth = GetRoutedSynth(deviceIndex);
         pitchRoutedSynth?.SetParameter("pitchbend", normalizedBipolar);
+        ParameterChanged?.Invoke("pitchbend", normalizedBipolar);
 
         lock (_midiMappings)
         {
@@ -716,6 +731,7 @@ public class AudioEngine : IDisposable
                 if (mapping.deviceIndex == deviceIndex && mapping.control == -1) // -1 denotes pitch bend
                 {
                     mapping.synth.SetParameter(mapping.parameter, normalizedUnipolar);
+                    ParameterChanged?.Invoke(mapping.parameter, normalizedUnipolar);
                 }
             }
         }
